@@ -77,8 +77,10 @@ export default function Submissions() {
     return status.replace("_", " ").toUpperCase();
   };
 
-  // A disputed row is shown as DISPUTED (it sits in the review queue) until a reviewer decides.
-  const displayStatus = (sub: any) => (sub.disputed ? "disputed" : sub.status);
+  // Show DISPUTED only while it's actually back in the review queue. Once a reviewer
+  // decides, show the real outcome (accepted/invalid) — but it can't be disputed again.
+  const displayStatus = (sub: any) =>
+    sub.disputed && sub.status === "in_review" ? "disputed" : sub.status;
 
   const totalPages = data ? Math.ceil(data.total / limit) : 1;
 
@@ -187,7 +189,9 @@ export default function Submissions() {
                       </TableCell>
                       <TableCell className="text-right">
                         {(sub as any).disputed ? (
-                          <span className="text-xs text-muted-foreground">Awaiting review</span>
+                          <span className="text-xs text-muted-foreground">
+                            {sub.status === "in_review" ? "Awaiting review" : "Disputed"}
+                          </span>
                         ) : DISPUTABLE.includes(sub.status) ? (
                           <Button
                             variant="outline"
