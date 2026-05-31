@@ -1,6 +1,7 @@
 import { Shell } from "@/components/layout/Shell";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import {
   UploadCloud,
   Clock,
@@ -13,18 +14,29 @@ import {
   FileCheck,
   Ban,
   ArrowRight,
+  Smartphone,
+  Maximize2,
 } from "lucide-react";
+
+// Public assets, base-path aware (the app may be served under a sub-path).
+const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`;
+
+const samples = [
+  { platform: "Instagram", src: "mock-instagram.png" },
+  { platform: "X", src: "mock-x.png" },
+  { platform: "TikTok", src: "mock-tiktok.png" },
+];
 
 const steps = [
   {
     number: "01",
     icon: UploadCloud,
-    title: "Upload a Screenshot",
+    title: "Upload a Mobile Screenshot",
     color: "text-primary",
     bg: "bg-primary/10",
     border: "border-primary/20",
     description:
-      "Go to the Upload page and drag & drop or select one or more screenshot images. Supported formats: JPG, PNG, WEBP. Each file is uploaded individually so you can track progress per item.",
+      "Go to the Upload page and drag & drop or select one or more screenshots taken on your phone (JPG, PNG, WEBP). Make sure the display name, @handle and the verified badge are fully visible and uncropped. Each file uploads individually so you can track progress per item.",
   },
   {
     number: "02",
@@ -97,6 +109,67 @@ export default function Instructions() {
             Everything you need to know to start submitting and earning points.
           </p>
         </div>
+
+        {/* Mobile screenshots + examples */}
+        <section className="mb-12">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">
+            Upload Mobile Screenshots
+          </h2>
+          <div className="bg-card border border-primary/20 rounded-xl p-6 mb-6 flex gap-5 items-start">
+            <div className="w-11 h-11 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+              <Smartphone size={22} className="text-primary" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base uppercase tracking-wide text-primary mb-1.5">
+                Take it on your phone
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Upload <span className="text-foreground font-semibold">screenshots taken on your mobile phone</span> of
+                the full profile page — the display name, @handle and the official verified badge must all be visible and
+                uncropped. Desktop or web captures, photos of a screen, and edited or cropped images are not accepted.
+              </p>
+            </div>
+          </div>
+
+          <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
+            Examples — tap to enlarge
+          </p>
+          <div className="grid grid-cols-3 gap-3 sm:gap-4">
+            {samples.map((s) => (
+              <Dialog key={s.platform}>
+                <DialogTrigger asChild>
+                  <button
+                    className="group relative bg-card border border-border rounded-xl overflow-hidden hover:border-primary/40 transition-colors"
+                    aria-label={`View ${s.platform} example screenshot`}
+                  >
+                    <img
+                      src={asset(s.src)}
+                      alt={`${s.platform} profile screenshot example`}
+                      className="w-full h-auto"
+                      loading="lazy"
+                    />
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                      <Maximize2 size={20} className="text-white" />
+                    </div>
+                    <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider p-2 text-center">
+                      {s.platform}
+                    </span>
+                  </button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogTitle className="text-sm uppercase tracking-wide">
+                    {s.platform} — example screenshot
+                  </DialogTitle>
+                  <img
+                    src={asset(s.src)}
+                    alt={`${s.platform} profile screenshot example`}
+                    className="w-full h-auto rounded-lg"
+                  />
+                </DialogContent>
+              </Dialog>
+            ))}
+          </div>
+        </section>
 
         {/* Steps */}
         <section className="mb-12">
