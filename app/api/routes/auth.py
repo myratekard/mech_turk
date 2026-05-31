@@ -86,10 +86,10 @@ def clerk_sync(body: ClerkSyncInput, authorization: Optional[str] = Header(defau
 
     email = (body.email or "").strip() or None
     org_id_claim, org_role_claim = org_from_claims(claims)
-    is_first = auth_db.count_all_users() == 0
+    # Superuser is determined SOLELY by SUPERUSER_EMAIL — no "first user wins" fallback,
+    # which on a public URL would let a stranger claim superuser before the owner signs in.
     is_superuser = bool(
-        (settings.superuser_email and email and email.lower() == settings.superuser_email.lower())
-        or is_first
+        settings.superuser_email and email and email.lower() == settings.superuser_email.lower()
     )
 
     role, referred_by, join_org = "user", None, None
