@@ -3,7 +3,7 @@ __pycache__/
 .env
 .venv/
 venv/
-artifacts/
+/artifacts/
 *.egg-info/
 .pytest_cache/
 report*.json
@@ -12,6 +12,10 @@ _label/
 verify/samples/_fullres/
 
 # frontend monorepo
+# Track the turk dashboard app, but not the other Replit-generated scaffolds
+# (api-server is superseded by our FastAPI backend; mockup-sandbox is scratch).
+frontend/artifacts/api-server/
+frontend/artifacts/mockup-sandbox/
 frontend/**/node_modules/
 frontend/**/dist/
 frontend/**/.vite/
