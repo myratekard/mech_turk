@@ -71,10 +71,14 @@ def test_dashboard_summary_breakdown(mongo):
     assert any(b["key"] == "accepted" and b["points"] == 50 for b in s["pointsBreakdown"])
 
 
-def test_auth_seed_and_referrals(mongo):
+def test_auth_no_seed_and_referrals(mongo):
     mauth.init_auth_db()
-    su = mauth.get_user_by_username(settings.superuser_username)
-    assert su and su["role"] == "superuser" and su["id"] == 1
+    # No superuser is seeded anymore — the DB starts empty.
+    assert mauth.get_user_by_username(settings.superuser_username) is None
+    su = mauth.create_user(
+        username="boss", email="boss@x.com", password="x", role="superuser",
+        org_id=None, referred_by=None,
+    )
     u = mauth.create_clerk_user(
         clerk_id="ck1", username="alice", email="a@x.com", role="user",
         org_id=None, referred_by=su["id"],
