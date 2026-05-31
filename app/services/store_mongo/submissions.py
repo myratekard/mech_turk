@@ -11,7 +11,7 @@ from typing import List, Optional, Tuple
 from pymongo import ASCENDING, DESCENDING
 
 from app.core.config import settings
-from app.services.mongo_client import clean, db, next_id
+from app.services.mongo_client import clean, col, db, next_id
 
 _COL = "submissions"
 
@@ -24,7 +24,7 @@ def _now() -> str:
 
 
 def _c():
-    return db()[_COL]
+    return col(_COL)
 
 
 def init_db() -> None:

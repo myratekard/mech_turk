@@ -22,9 +22,14 @@ def db():
     return _client()[settings.mongo_db]
 
 
+def col(name: str):
+    """A collection, with the configured prefix applied (for shared-database deployments)."""
+    return db()[settings.mongo_collection_prefix + name]
+
+
 def next_id(name: str) -> int:
     """Atomic auto-increment integer id (preserves the int ids the API/frontend expect)."""
-    doc = db().counters.find_one_and_update(
+    doc = col("counters").find_one_and_update(
         {"_id": name},
         {"$inc": {"seq": 1}},
         upsert=True,
