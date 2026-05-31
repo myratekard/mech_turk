@@ -58,20 +58,8 @@ def init_auth_db() -> None:
     _invites().create_index("email", unique=True)
     _orgs().create_index("reg_code", unique=True, sparse=True)
     _orgs().create_index("slug", unique=True, sparse=True)
-    _seed_superuser()
-
-
-def _seed_superuser() -> None:
-    if get_user_by_username(settings.superuser_username):
-        return
-    create_user(
-        username=settings.superuser_username,
-        email=None,
-        password=settings.superuser_password,
-        role="superuser",
-        org_id=None,
-        referred_by=None,
-    )
+    # No superuser is seeded: the superuser is provisioned on the first Clerk sign-in whose
+    # email matches SUPERUSER_EMAIL (see app/api/routes/auth.py::clerk_sync).
 
 
 def _unique_referral_code() -> str:
