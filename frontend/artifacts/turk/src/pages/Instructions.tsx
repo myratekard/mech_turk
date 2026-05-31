@@ -65,8 +65,8 @@ const rules = [
   },
   {
     icon: Ban,
-    label: "Duplicates earn less",
-    detail: "Each account should be captured once. Re-uploading the same image, or an account that's already been captured, earns reduced points rather than the full amount.",
+    label: "Duplicates lose points",
+    detail: "Each account should be captured once. Submitting an account that's already been captured deducts 5 points, and re-uploading the same image deducts 10 — so only submit fresh, verified accounts.",
   },
   {
     icon: AlertTriangle,
@@ -76,9 +76,9 @@ const rules = [
 ];
 
 const pointTiers = [
-  { label: "Approved verified account", range: "50 pts", color: "text-green-500" },
-  { label: "Self-duplicate (you re-upload the same image)", range: "10 pts", color: "text-primary" },
-  { label: "Duplicate (account already captured)", range: "5 pts", color: "text-fuchsia-500" },
+  { label: "Approved verified account", range: "+50 pts", color: "text-green-500" },
+  { label: "Duplicate (account already captured)", range: "−5 pts", color: "text-red-500" },
+  { label: "Self-duplicate (you re-upload the same image)", range: "−10 pts", color: "text-red-500" },
   { label: "Invalid / unsupported", range: "0 pts", color: "text-muted-foreground" },
 ];
 

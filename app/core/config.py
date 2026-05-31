@@ -53,9 +53,9 @@ class Settings:
     auth_token_ttl_hours: int = int(os.getenv("AUTH_TOKEN_TTL_HOURS", "168"))  # 7 days
     superuser_username: str = os.getenv("SUPERUSER_USERNAME", "adeyehat")
     superuser_password: str = os.getenv("SUPERUSER_PASSWORD", "adeyehat123")
-    points_accepted: int = int(os.getenv("POINTS_ACCEPTED", "50"))         # new verified capture
-    points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "5"))        # account already captured / others' re-upload
-    points_self_duplicate: int = int(os.getenv("POINTS_SELF_DUPLICATE", "10"))  # same user re-uploads the same image
+    points_accepted: int = int(os.getenv("POINTS_ACCEPTED", "50"))            # new verified capture
+    points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "-5"))          # account already captured / others' re-upload (penalty)
+    points_self_duplicate: int = int(os.getenv("POINTS_SELF_DUPLICATE", "-10"))  # same user re-uploads the same image (penalty)
 
     # --- Abuse / cost controls ---
     daily_upload_limit: int = int(os.getenv("DAILY_UPLOAD_LIMIT", "200"))  # per user / 24h
