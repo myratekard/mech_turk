@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+artifacts/
+*.egg-info/
+.pytest_cache/
+report*.json
+_label/
+
+# frontend monorepo
+frontend/**/node_modules/
+frontend/**/dist/
+frontend/**/.vite/
+frontend/.pnpm-store/
