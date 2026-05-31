@@ -4,13 +4,43 @@ import { api, ReviewItem } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, XCircle, RefreshCw, ShieldCheck } from "lucide-react";
+import { CheckCircle2, XCircle, RefreshCw, ShieldCheck, ImageOff, Maximize2, X, ExternalLink } from "lucide-react";
+
+// Thumbnail that opens the full image on click and degrades gracefully when the
+// source can't be loaded (e.g. legacy rows with a missing/placeholder image_url).
+function Thumb({ src, alt, onOpen }: { src?: string; alt: string; onOpen: () => void }) {
+  const [broken, setBroken] = useState(false);
+  const canOpen = !!src && !broken;
+  return (
+    <button
+      type="button"
+      onClick={canOpen ? onOpen : undefined}
+      title={canOpen ? "Click to view full image" : "Preview unavailable"}
+      className={`group relative w-full md:w-48 h-48 rounded-lg overflow-hidden bg-muted border border-border shrink-0 ${canOpen ? "cursor-zoom-in" : "cursor-default"}`}
+    >
+      {!src || broken ? (
+        <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground gap-1.5">
+          <ImageOff size={28} />
+          <span className="text-[11px] font-medium">Preview unavailable</span>
+        </div>
+      ) : (
+        <>
+          <img src={src} alt={alt} className="w-full h-full object-cover" onError={() => setBroken(true)} />
+          <span className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/40 opacity-0 group-hover:opacity-100 transition-all">
+            <Maximize2 size={22} className="text-white" />
+          </span>
+        </>
+      )}
+    </button>
+  );
+}
 
 export default function ReviewQueue() {
   const { toast } = useToast();
   const [items, setItems] = useState<ReviewItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [busyId, setBusyId] = useState<number | null>(null);
+  const [busy, setBusy] = useState<{ id: number; kind: "approve" | "reject" | "rerun" } | null>(null);
+  const [preview, setPreview] = useState<{ url: string; name: string } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -29,7 +59,7 @@ export default function ReviewQueue() {
   }, [load]);
 
   const act = async (id: number, kind: "approve" | "reject" | "rerun") => {
-    setBusyId(id);
+    setBusy({ id, kind });
     try {
       const res: any = await api[kind](id);
       toast({ title: `Done: ${kind}`, description: `Submission #${id} → ${res?.status ?? "updated"}` });
@@ -42,7 +72,7 @@ export default function ReviewQueue() {
     } catch (e: any) {
       toast({ title: `Failed to ${kind}`, description: e?.message, variant: "destructive" });
     } finally {
-      setBusyId(null);
+      setBusy(null);
     }
   };
 
@@ -69,11 +99,26 @@ export default function ReviewQueue() {
           </div>
         ) : (
           <div className="space-y-4">
-            {items.map((it) => (
-              <div key={it.id} className="bg-card border border-border rounded-xl p-4 flex flex-col md:flex-row gap-4">
-                <div className="w-full md:w-48 h-48 rounded-lg overflow-hidden bg-muted border border-border shrink-0">
-                  <img src={it.imageUrl} alt={it.fileName || "submission"} className="w-full h-full object-cover" />
-                </div>
+            {items.map((it) => {
+              const isBusy = busy?.id === it.id;
+              return (
+              <div
+                key={it.id}
+                className={`relative bg-card border border-border rounded-xl p-4 flex flex-col md:flex-row gap-4 transition-opacity ${
+                  isBusy ? "opacity-50 pointer-events-none" : ""
+                }`}
+              >
+                {isBusy && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center gap-2 text-sm font-semibold text-muted-foreground">
+                    <RefreshCw size={18} className="animate-spin text-primary" />
+                    {busy?.kind === "rerun" ? "Re-running AI…" : busy?.kind === "approve" ? "Approving…" : "Rejecting…"}
+                  </div>
+                )}
+                <Thumb
+                  src={it.imageUrl}
+                  alt={it.fileName || "submission"}
+                  onOpen={() => setPreview({ url: it.imageUrl, name: it.fileName || "submission" })}
+                />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="font-bold truncate">#{it.id} · {it.fileName || "Untitled"}</h3>
@@ -91,19 +136,58 @@ export default function ReviewQueue() {
                     <p className="text-xs text-muted-foreground italic mb-3 line-clamp-2">“{it.reasoning}”</p>
                   )}
                   <div className="flex flex-wrap gap-2">
-                    <Button size="sm" disabled={busyId === it.id} onClick={() => act(it.id, "approve")}
+                    <Button size="sm" disabled={isBusy} onClick={() => act(it.id, "approve")}
                       className="gap-1 bg-green-600 hover:bg-green-600/90 text-white"><CheckCircle2 size={15} /> Approve</Button>
-                    <Button size="sm" disabled={busyId === it.id} onClick={() => act(it.id, "reject")}
+                    <Button size="sm" disabled={isBusy} onClick={() => act(it.id, "reject")}
                       variant="outline" className="gap-1 border-destructive/40 text-destructive hover:bg-destructive/10"><XCircle size={15} /> Reject</Button>
-                    <Button size="sm" disabled={busyId === it.id} onClick={() => act(it.id, "rerun")}
-                      variant="outline" className="gap-1"><RefreshCw size={15} /> Re-run AI</Button>
+                    <Button size="sm" disabled={isBusy} onClick={() => act(it.id, "rerun")}
+                      variant="outline" className="gap-1">
+                      <RefreshCw size={15} className={isBusy && busy?.kind === "rerun" ? "animate-spin" : ""} />
+                      {isBusy && busy?.kind === "rerun" ? "Re-running…" : "Re-run AI"}
+                    </Button>
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* Full-image lightbox */}
+      {preview && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4"
+          onClick={() => setPreview(null)}
+        >
+          <div className="relative max-w-4xl max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
+            <img
+              src={preview.url}
+              alt={preview.name}
+              className="max-w-full max-h-[90vh] rounded-lg object-contain shadow-2xl"
+            />
+            <div className="absolute top-2 right-2 flex gap-2">
+              <a
+                href={preview.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Open original in new tab"
+                className="w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+              >
+                <ExternalLink size={16} />
+              </a>
+              <button
+                onClick={() => setPreview(null)}
+                title="Close"
+                className="w-9 h-9 rounded-full bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <p className="mt-2 text-center text-xs text-white/70 font-mono truncate">{preview.name}</p>
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }

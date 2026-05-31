@@ -1,14 +1,15 @@
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Activity, ShieldCheck, UploadCloud, BarChart3, ArrowRight } from "lucide-react";
+import { PhoneMockups } from "@/components/PhoneMockups";
 
 export default function Landing() {
   const [, setLocation] = useLocation();
 
   const features = [
-    { icon: UploadCloud, title: "Upload Intel", desc: "Drop verified-account screenshots and let the AI extract the details." },
-    { icon: ShieldCheck, title: "Verified Only", desc: "Every submission is checked for the official platform verified badge." },
-    { icon: BarChart3, title: "Track & Earn", desc: "Accepted submissions earn points. Watch your stats climb." },
+    { icon: UploadCloud, title: "Snap & Upload", desc: "Screenshot a verified social profile and drop it in. Takes seconds." },
+    { icon: ShieldCheck, title: "Verified Only", desc: "Make sure the account has the official verified badge — that's what counts." },
+    { icon: BarChart3, title: "Track & Earn", desc: "Accepted uploads earn points. Watch your earnings climb." },
   ];
 
   return (
@@ -28,25 +29,28 @@ export default function Landing() {
 
       {/* Hero */}
       <main className="flex-1">
-        <section className="max-w-4xl mx-auto px-6 pt-20 pb-16 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-primary/20 bg-primary/5 text-primary text-xs font-bold uppercase tracking-wider mb-6">
-            <ShieldCheck size={14} /> Verified-account intel platform
+        <section className="max-w-4xl mx-auto px-6 pt-20 pb-4 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-muted/50 border border-border mb-6 backdrop-blur-sm">
+            <span className="flex h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(0,255,255,0.8)] animate-pulse"></span>
+            <span className="text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Now open</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight leading-[1.05] mb-6">
-            Collect, verify &amp; document<br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">verified social accounts</span>
+            Screenshot. Submit.<br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Earn.</span>
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-10">
-            Upload profile screenshots — TURK confirms the official verified badge, extracts the profile,
-            and routes the rest to a review queue. Built for teams running at scale.
+            Upload screenshots and earn points on the leaderboard.
           </p>
           <div className="flex items-center justify-center gap-3">
             <Button onClick={() => setLocation("/login")} className="font-bold uppercase tracking-wider gap-2 shadow-[0_0_15px_rgba(0,255,255,0.3)]">
-              Enter Console <ArrowRight size={16} />
+              Start Earning <ArrowRight size={16} />
             </Button>
           </div>
           <p className="text-xs text-muted-foreground mt-4">Access is invite-only. Have a registration link? Open it to create your account.</p>
         </section>
+
+        {/* Supported platforms — Instagram / X / TikTok mockups */}
+        <PhoneMockups />
 
         {/* Features */}
         <section className="max-w-5xl mx-auto px-6 pb-24 grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -63,7 +67,7 @@ export default function Landing() {
       </main>
 
       <footer className="border-t border-border py-6 text-center text-xs text-muted-foreground">
-        TURK · Verified-Account Artifact Extractor
+        TURK · Upload verified accounts. Earn.
       </footer>
     </div>
   );

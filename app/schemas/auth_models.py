@@ -50,6 +50,7 @@ class OrgAnalytics(BaseModel):
 
 class UserStat(BaseModel):
     userId: int
+    userKey: str = ""   # raw submissions user_id — unique per row (userId may be 0 for non-numeric ids)
     username: str
     total: int
     accepted: int

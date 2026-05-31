@@ -59,6 +59,7 @@ export interface Analytics {
 
 export interface UserStat {
   userId: number;
+  userKey: string;
   username: string;
   total: number;
   accepted: number;

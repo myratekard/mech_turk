@@ -295,6 +295,7 @@ def analytics_per_user(user: dict = Depends(_analytics_roles)):
             u = None
         out.append(UserStat(
             userId=int(s["user_id"]) if str(s["user_id"]).isdigit() else 0,
+            userKey=str(s["user_id"]),
             username=u["username"] if u else f"user:{s['user_id']}",
             total=s["total"], accepted=s["accepted"], invalid=s["invalid"],
             inReview=s["in_review"], duplicate=s["duplicate"],

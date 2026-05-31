@@ -46,6 +46,13 @@ class SubmissionList(BaseModel):
     limit: int
 
 
+class PointsBreakdownEntry(BaseModel):
+    key: str
+    label: str
+    count: int
+    points: int
+
+
 class DashboardSummary(BaseModel):
     totalPoints: int
     totalSubmissions: int
@@ -56,6 +63,7 @@ class DashboardSummary(BaseModel):
     duplicate: int = 0
     unsupported: int = 0
     updatedToday: int
+    pointsBreakdown: List[PointsBreakdownEntry] = []
 
 
 class UploadUrlRequest(BaseModel):

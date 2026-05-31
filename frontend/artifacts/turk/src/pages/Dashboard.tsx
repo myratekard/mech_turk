@@ -105,6 +105,14 @@ export default function Dashboard() {
           />
         </div>
 
+        {/* Points breakdown — shows exactly where the total comes from */}
+        {summary && (
+          <PointsBreakdown
+            breakdown={(summary as any).pointsBreakdown}
+            total={summary.totalPoints}
+          />
+        )}
+
         {/* Recent Submissions */}
         <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
           <div className="p-6 border-b border-border flex justify-between items-center bg-muted/20">
@@ -173,6 +181,60 @@ export default function Dashboard() {
         </div>
       </div>
     </Shell>
+  );
+}
+
+type BreakdownEntry = { key: string; label: string; count: number; points: number };
+
+function PointsBreakdown({ breakdown, total }: { breakdown?: BreakdownEntry[]; total?: number }) {
+  if (!breakdown || breakdown.length === 0) return null;
+  // Only show categories that actually have submissions, ordered as the API returns them.
+  const rows = breakdown.filter((b) => b.count > 0);
+  if (rows.length === 0) return null;
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm mb-10">
+      <div className="p-6 border-b border-border flex items-center justify-between bg-muted/20">
+        <h2 className="text-xl font-bold uppercase tracking-wide flex items-center gap-2">
+          <Zap size={20} className="text-primary" /> Points Breakdown
+        </h2>
+        <span className="text-xs text-muted-foreground font-medium">How your total is calculated</span>
+      </div>
+
+      <div className="divide-y divide-border">
+        {rows.map((b) => {
+          const scores = b.points !== 0;
+          return (
+            <div key={b.key} className="px-6 py-3 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="font-semibold text-sm truncate">{b.label}</span>
+                <Badge variant="outline" className="text-[10px] font-mono shrink-0">×{b.count}</Badge>
+              </div>
+              <span
+                className={`font-black font-mono tracking-tight ${
+                  b.points > 0 ? "text-green-500" : b.points < 0 ? "text-red-500" : "text-muted-foreground"
+                }`}
+              >
+                {scores ? `${b.points > 0 ? "+" : ""}${b.points.toLocaleString()}` : "0"}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="px-6 py-4 flex items-center justify-between bg-muted/20 border-t border-border">
+        <span className="text-sm font-bold uppercase tracking-wide">Total Points</span>
+        <span className="text-2xl font-black font-mono text-primary tracking-tight">
+          {(total ?? 0).toLocaleString()}
+        </span>
+      </div>
+
+      <p className="px-6 pb-4 pt-1 text-xs text-muted-foreground">
+        Each accepted screenshot earns points; duplicate uploads are penalized. Pending submissions
+        don&apos;t count until a reviewer approves them. Think a decision is wrong? Use{" "}
+        <span className="font-semibold text-foreground">Dispute</span> on the Intel Log.
+      </p>
+    </div>
   );
 }
 

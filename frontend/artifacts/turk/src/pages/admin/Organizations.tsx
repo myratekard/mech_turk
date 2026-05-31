@@ -4,7 +4,7 @@ import { api, Org } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, MailCheck } from "lucide-react";
+import { Building2, Plus, MailCheck, Search } from "lucide-react";
 
 export default function Organizations() {
   const { toast } = useToast();
@@ -12,9 +12,17 @@ export default function Organizations() {
   const [name, setName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
 
   const load = () => api.listOrgs().then(setOrgs).catch(() => {});
   useEffect(() => { load(); }, []);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? orgs.filter(
+        (o) => o.name.toLowerCase().includes(q) || o.id.toLowerCase().includes(q),
+      )
+    : orgs;
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,11 +64,23 @@ export default function Organizations() {
           <Button type="submit" disabled={busy} className="gap-1 shrink-0"><Plus size={16} /> Create</Button>
         </form>
 
+        <div className="relative mb-4">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or ID…"
+            className="pl-9"
+          />
+        </div>
+
         <div className="bg-card border border-border rounded-xl divide-y divide-border">
           {orgs.length === 0 ? (
             <p className="p-6 text-muted-foreground text-sm">No organizations yet.</p>
+          ) : filtered.length === 0 ? (
+            <p className="p-6 text-muted-foreground text-sm">No organizations match “{query}”.</p>
           ) : (
-            orgs.map((o) => (
+            filtered.map((o) => (
               <div key={o.id} className="p-4 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold">{o.name}</p>

@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Users as UsersIcon, ShieldPlus, MailCheck } from "lucide-react";
+import { Users as UsersIcon, ShieldPlus, MailCheck, Search } from "lucide-react";
 
 // Org-admin: invite STAFF (always admin) by email — Clerk sends the email.
 // Uploader users are NOT added here; they join via the org's referral link.
@@ -14,9 +14,19 @@ export default function Staff() {
   const [members, setMembers] = useState<{ email: string; name: string; role: string }[]>([]);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
 
   const load = () => api.listStaff().then(setMembers).catch(() => {});
   useEffect(() => { load(); }, []);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? members.filter(
+        (m) =>
+          (m.name || "").toLowerCase().includes(q) ||
+          m.email.toLowerCase().includes(q),
+      )
+    : members;
 
   const invite = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,11 +63,23 @@ export default function Staff() {
           <MailCheck size={13} /> Staff join as <b>admin</b>.
         </p>
 
+        <div className="relative mb-4">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or email…"
+            className="pl-9"
+          />
+        </div>
+
         <div className="bg-card border border-border rounded-xl divide-y divide-border">
           {members.length === 0 ? (
             <p className="p-6 text-muted-foreground text-sm">No members yet.</p>
+          ) : filtered.length === 0 ? (
+            <p className="p-6 text-muted-foreground text-sm">No members match “{query}”.</p>
           ) : (
-            members.map((m, i) => (
+            filtered.map((m, i) => (
               <div key={i} className="p-4 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold truncate">{m.name || m.email}</p>

@@ -3,9 +3,10 @@ import { Shell } from "@/components/layout/Shell";
 import { api, User } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Users as UsersIcon, Ban, ShieldCheck } from "lucide-react";
+import { Users as UsersIcon, Ban, ShieldCheck, Search } from "lucide-react";
 
 // Superuser-only: moderate (block/unblock) any provisioned user across the platform.
 export default function Users() {
@@ -13,9 +14,19 @@ export default function Users() {
   const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState("");
 
   const load = () => api.listUsers().then(setUsers).catch(() => {});
   useEffect(() => { load(); }, []);
+
+  const q = query.trim().toLowerCase();
+  const filtered = q
+    ? users.filter(
+        (u) =>
+          u.username.toLowerCase().includes(q) ||
+          (u.email || "").toLowerCase().includes(q),
+      )
+    : users;
 
   const run = async (fn: () => Promise<any>, label: string) => {
     setBusy(true);
@@ -34,11 +45,23 @@ export default function Users() {
           <p className="text-muted-foreground font-medium">Moderate any account on the platform.</p>
         </div>
 
+        <div className="relative mb-4">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by name or email…"
+            className="pl-9"
+          />
+        </div>
+
         <div className="bg-card border border-border rounded-xl divide-y divide-border">
           {users.length === 0 ? (
             <p className="p-6 text-muted-foreground text-sm">No users yet.</p>
+          ) : filtered.length === 0 ? (
+            <p className="p-6 text-muted-foreground text-sm">No users match “{query}”.</p>
           ) : (
-            users.map((u) => {
+            filtered.map((u) => {
               const canBlock = u.id !== me?.id && u.role !== "superuser";
               return (
                 <div key={u.id} className="p-4 flex items-center justify-between gap-3">
