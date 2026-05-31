@@ -57,6 +57,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE submissions ADD COLUMN acct_platform TEXT")
         if "acct_handle" not in cols:
             conn.execute("ALTER TABLE submissions ADD COLUMN acct_handle TEXT")
+        if "image_hash" not in cols:
+            conn.execute("ALTER TABLE submissions ADD COLUMN image_hash TEXT")
 
 
 def insert_submission(
@@ -72,6 +74,7 @@ def insert_submission(
     org_id: Optional[int] = None,
     acct_platform: Optional[str] = None,
     acct_handle: Optional[str] = None,
+    image_hash: Optional[str] = None,
 ) -> dict:
     ts = _now()
     with _connect() as conn:
@@ -79,11 +82,11 @@ def insert_submission(
             """
             INSERT INTO submissions
                 (user_id, org_id, image_url, object_path, file_name, platform, status, points,
-                 analysis_json, acct_platform, acct_handle, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 analysis_json, acct_platform, acct_handle, image_hash, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (user_id, org_id, image_url, object_path, file_name, platform, status, points,
-             analysis_json, acct_platform, acct_handle, ts, ts),
+             analysis_json, acct_platform, acct_handle, image_hash, ts, ts),
         )
         row = conn.execute(
             "SELECT * FROM submissions WHERE id = ?", (cur.lastrowid,)
@@ -173,6 +176,34 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
         }
         for r in rows
     ]
+
+
+def count_user_uploads_since(user_id: str, since_iso: str) -> int:
+    with _connect() as conn:
+        return int(conn.execute(
+            "SELECT COUNT(*) c FROM submissions WHERE user_id=? AND created_at >= ?",
+            (user_id, since_iso),
+        ).fetchone()["c"])
+
+
+def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000) -> Optional[dict]:
+    """Nearest prior submission within max_distance bits (most recent first). None if no image_hash."""
+    if not image_hash:
+        return None
+    from app.services.imagehash import hamming
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT * FROM submissions WHERE image_hash IS NOT NULL ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    best, best_d = None, max_distance + 1
+    for r in rows:
+        d = hamming(image_hash, r["image_hash"])
+        if d <= max_distance and d < best_d:
+            best, best_d = dict(r), d
+            if d == 0:
+                break
+    return best
 
 
 def reassign_user(old_user_id: str, new_user_id: str) -> int:

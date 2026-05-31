@@ -13,6 +13,8 @@ class Settings:
     # Gemini (LangChain) — reuse the shared myratekard GOOGLE_API_KEY
     google_api_key: str = os.getenv("GOOGLE_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    # Gemini 2.5 "thinking" tokens are billed as output and dominate cost; 0 disables them.
+    gemini_thinking_budget: int = int(os.getenv("GEMINI_THINKING_BUDGET", "0"))
 
     # Accepted upload mime types
     allowed_mime: tuple[str, ...] = (
@@ -43,6 +45,11 @@ class Settings:
     superuser_username: str = os.getenv("SUPERUSER_USERNAME", "adeyehat")
     superuser_password: str = os.getenv("SUPERUSER_PASSWORD", "adeyehat123")
     points_accepted: int = int(os.getenv("POINTS_ACCEPTED", "100"))
+
+    # --- Abuse / cost controls ---
+    daily_upload_limit: int = int(os.getenv("DAILY_UPLOAD_LIMIT", "200"))  # per user / 24h
+    phash_distance: int = int(os.getenv("PHASH_DISTANCE", "5"))            # near-dup bit threshold
+    reupload_penalty: int = int(os.getenv("REUPLOAD_PENALTY", "25"))       # points deducted on self re-upload
 
     # Public base URL of the frontend, used to build registration links in emails.
     app_base_url: str = os.getenv("APP_BASE_URL", "http://localhost:5173")

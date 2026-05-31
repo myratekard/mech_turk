@@ -4,7 +4,7 @@ python-multipart
 pydantic
 python-dotenv
 langchain
-langchain-google-genai
+langchain-google-genai>=2.1  # >=2.1 for thinking_budget (disable thinking to cut cost)
 pillow
 opencv-python-headless
 numpy

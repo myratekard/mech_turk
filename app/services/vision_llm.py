@@ -63,6 +63,7 @@ def _structured_model():
         model=settings.gemini_model,
         temperature=0,
         google_api_key=settings.google_api_key or None,
+        thinking_budget=settings.gemini_thinking_budget,  # 0 = no thinking tokens (cheaper)
     )
     return model.with_structured_output(VisionAnalysis)
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -24,6 +25,7 @@ from app.schemas.api_models import (
     UploadUrlResponse,
 )
 from app.services import storage, submissions_db
+from app.services.imagehash import average_hash
 from app.services.pipeline import analyze as run_pipeline
 
 router = APIRouter()
@@ -113,6 +115,33 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     if data is None:
         raise HTTPException(status_code=400, detail="Uploaded object not found")
 
+    uid = str(user["id"])
+
+    # 1) Rate limit: cap uploads per user / 24h.
+    since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    if submissions_db.count_user_uploads_since(uid, since) >= settings.daily_upload_limit:
+        raise HTTPException(status_code=429, detail="Daily upload limit reached. Try again later.")
+
+    # 2) Perceptual-hash pre-check: a re-uploaded / near-identical image skips the LLM
+    #    entirely (no token spend). Re-uploading your own image is penalized.
+    try:
+        img_hash = average_hash(data)
+    except Exception:
+        img_hash = None
+    match = submissions_db.find_phash_match(img_hash, settings.phash_distance) if img_hash else None
+    if match:
+        same_user = match["user_id"] == uid
+        points = -settings.reupload_penalty if same_user else 0
+        row = submissions_db.insert_submission(
+            user_id=uid, org_id=user.get("org_id"), image_url=body.imageUrl,
+            object_path=body.objectPath, file_name=body.fileName,
+            platform=match["platform"], status="duplicate", points=points,
+            analysis_json=match["analysis_json"], acct_platform=match["acct_platform"],
+            acct_handle=match["acct_handle"], image_hash=img_hash,
+        )
+        return _row_to_submission(row)
+
+    # 3) Novel image -> run the engine (the only path that spends tokens).
     mime, _ = mimetypes.guess_type(body.fileName or body.objectPath)
     try:
         result = run_pipeline(data, mime=mime or "image/jpeg", persist=False)
@@ -122,15 +151,14 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     status, points = map_status_points(result)
     platform = body.platform or platform_label(result)
 
-    # Duplicate guard: the same verified account (platform + handle) captured before
-    # is allowed but earns no points.
+    # Account-level duplicate (same platform+handle already captured) earns no points.
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
     if status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle):
         status, points = "duplicate", 0
 
     row = submissions_db.insert_submission(
-        user_id=str(user["id"]),
+        user_id=uid,
         org_id=user.get("org_id"),
         image_url=body.imageUrl,
         object_path=body.objectPath,
@@ -141,6 +169,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
         analysis_json=result.model_dump_json(),
         acct_platform=acct_platform,
         acct_handle=acct_handle,
+        image_hash=img_hash,
     )
     return _row_to_submission(row)
 
