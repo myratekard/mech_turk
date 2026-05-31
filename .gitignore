@@ -1,0 +1,22 @@
+__pycache__/
+*.pyc
+.env
+.venv/
+venv/
+/artifacts/
+*.egg-info/
+.pytest_cache/
+report*.json
+_label/
+# full-res personal screenshots used for CV iteration (don't commit ~300MB of user data)
+verify/samples/_fullres/
+
+# frontend monorepo
+# Track the turk dashboard app, but not the other Replit-generated scaffolds
+# (api-server is superseded by our FastAPI backend; mockup-sandbox is scratch).
+frontend/artifacts/api-server/
+frontend/artifacts/mockup-sandbox/
+frontend/**/node_modules/
+frontend/**/dist/
+frontend/**/.vite/
+frontend/.pnpm-store/

@@ -1,0 +1,23 @@
+# Keep the backend image small: ship only app/ + badges/ + requirements.
+.git/
+.github/
+.env
+.venv/
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+
+# Not needed at runtime
+frontend/
+verify/
+tools/
+tests/
+docs/
+artifacts/
+*.zip
+report*.json
+
+# Keep badges/*.png, drop the doc
+badges/README.md
