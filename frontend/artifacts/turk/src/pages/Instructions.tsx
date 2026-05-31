@@ -2,6 +2,7 @@ import { Shell } from "@/components/layout/Shell";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
+import { PROFILE_SCREENS, ScreenFrame } from "@/components/PhoneMockups";
 import {
   UploadCloud,
   Clock,
@@ -17,15 +18,6 @@ import {
   Smartphone,
   Maximize2,
 } from "lucide-react";
-
-// Public assets, base-path aware (the app may be served under a sub-path).
-const asset = (f: string) => `${import.meta.env.BASE_URL}${f}`;
-
-const samples = [
-  { platform: "Instagram", src: "mock-instagram.png" },
-  { platform: "X", src: "mock-x.png" },
-  { platform: "TikTok", src: "mock-tiktok.png" },
-];
 
 const steps = [
   {
@@ -50,23 +42,13 @@ const steps = [
   },
   {
     number: "03",
-    icon: FileCheck,
-    title: "Processed",
-    color: "text-blue-500",
-    bg: "bg-blue-500/10",
-    border: "border-blue-500/20",
-    description:
-      "Your screenshot has passed the initial review and is being looked at more closely before a final decision.",
-  },
-  {
-    number: "04",
     icon: CheckCircle2,
     title: "Accepted — Points Awarded",
     color: "text-green-500",
     bg: "bg-green-500/10",
     border: "border-green-500/20",
     description:
-      "Valid submissions are marked Accepted and points are added to your account. Points vary based on the quality and relevance of each submission. Check your dashboard to see your total.",
+      "Approved submissions are marked Accepted and points are added to your account — 50 points for a new verified account. Check your dashboard to see your total.",
   },
 ];
 
@@ -83,8 +65,8 @@ const rules = [
   },
   {
     icon: Ban,
-    label: "No duplicates",
-    detail: "Each screenshot may only be submitted once. Submitting the same image multiple times will result in all duplicates being rejected.",
+    label: "Duplicates earn less",
+    detail: "Each account should be captured once. Re-uploading the same image, or an account that's already been captured, earns reduced points rather than the full amount.",
   },
   {
     icon: AlertTriangle,
@@ -94,9 +76,10 @@ const rules = [
 ];
 
 const pointTiers = [
-  { label: "Standard", range: "10 – 25 pts", color: "text-muted-foreground" },
-  { label: "Good Quality", range: "26 – 40 pts", color: "text-primary" },
-  { label: "High Value", range: "41 – 59 pts", color: "text-secondary" },
+  { label: "Approved verified account", range: "50 pts", color: "text-green-500" },
+  { label: "Self-duplicate (you re-upload the same image)", range: "10 pts", color: "text-primary" },
+  { label: "Duplicate (account already captured)", range: "5 pts", color: "text-fuchsia-500" },
+  { label: "Invalid / unsupported", range: "0 pts", color: "text-muted-foreground" },
 ];
 
 export default function Instructions() {
@@ -134,37 +117,34 @@ export default function Instructions() {
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
             Examples — tap to enlarge
           </p>
-          <div className="grid grid-cols-3 gap-3 sm:gap-4">
-            {samples.map((s) => (
-              <Dialog key={s.platform}>
+          <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
+            {PROFILE_SCREENS.map(({ platform, Screen }) => (
+              <Dialog key={platform}>
                 <DialogTrigger asChild>
                   <button
-                    className="group relative bg-card border border-border rounded-xl overflow-hidden hover:border-primary/40 transition-colors"
-                    aria-label={`View ${s.platform} example screenshot`}
+                    className="group flex flex-col items-center gap-2 focus:outline-none"
+                    aria-label={`View ${platform} example screenshot`}
                   >
-                    <img
-                      src={asset(s.src)}
-                      alt={`${s.platform} profile screenshot example`}
-                      className="w-full h-auto"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                      <Maximize2 size={20} className="text-white" />
+                    <div className="relative group-hover:scale-[1.03] transition-transform">
+                      <ScreenFrame width={150}>
+                        <Screen />
+                      </ScreenFrame>
+                      <div className="absolute inset-0 rounded-3xl bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Maximize2 size={20} className="text-white" />
+                      </div>
                     </div>
-                    <span className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/70 to-transparent text-white text-[10px] sm:text-xs font-bold uppercase tracking-wider p-2 text-center">
-                      {s.platform}
+                    <span className="text-[10px] sm:text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                      {platform}
                     </span>
                   </button>
                 </DialogTrigger>
-                <DialogContent className="max-w-md">
+                <DialogContent className="w-auto max-w-none flex flex-col items-center gap-3">
                   <DialogTitle className="text-sm uppercase tracking-wide">
-                    {s.platform} — example screenshot
+                    {platform} — example profile
                   </DialogTitle>
-                  <img
-                    src={asset(s.src)}
-                    alt={`${s.platform} profile screenshot example`}
-                    className="w-full h-auto rounded-lg"
-                  />
+                  <ScreenFrame width={300}>
+                    <Screen />
+                  </ScreenFrame>
                 </DialogContent>
               </Dialog>
             ))}
@@ -241,7 +221,7 @@ export default function Instructions() {
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <div className="p-5 border-b border-border flex items-center gap-3">
               <Zap size={18} className="text-primary" />
-              <p className="font-bold text-sm uppercase tracking-wide">Point Ranges per Accepted Submission</p>
+              <p className="font-bold text-sm uppercase tracking-wide">Points per Submission</p>
             </div>
             <div className="divide-y divide-border">
               {pointTiers.map((tier) => (

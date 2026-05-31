@@ -53,12 +53,13 @@ class Settings:
     auth_token_ttl_hours: int = int(os.getenv("AUTH_TOKEN_TTL_HOURS", "168"))  # 7 days
     superuser_username: str = os.getenv("SUPERUSER_USERNAME", "adeyehat")
     superuser_password: str = os.getenv("SUPERUSER_PASSWORD", "adeyehat123")
-    points_accepted: int = int(os.getenv("POINTS_ACCEPTED", "100"))
+    points_accepted: int = int(os.getenv("POINTS_ACCEPTED", "50"))         # new verified capture
+    points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "5"))        # account already captured / others' re-upload
+    points_self_duplicate: int = int(os.getenv("POINTS_SELF_DUPLICATE", "10"))  # same user re-uploads the same image
 
     # --- Abuse / cost controls ---
     daily_upload_limit: int = int(os.getenv("DAILY_UPLOAD_LIMIT", "200"))  # per user / 24h
     phash_distance: int = int(os.getenv("PHASH_DISTANCE", "5"))            # near-dup bit threshold
-    reupload_penalty: int = int(os.getenv("REUPLOAD_PENALTY", "25"))       # points deducted on self re-upload
 
     # Public base URL of the frontend, used to build registration links in emails.
     app_base_url: str = os.getenv("APP_BASE_URL", "http://localhost:5173")

@@ -144,8 +144,9 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
         img_hash = None
     match = submissions_db.find_phash_match(img_hash, settings.phash_distance) if img_hash else None
     if match:
+        # Self-duplicate = the same user re-uploading the same image; others' re-upload = duplicate.
         same_user = match["user_id"] == uid
-        points = -settings.reupload_penalty if same_user else 0
+        points = settings.points_self_duplicate if same_user else settings.points_duplicate
         row = submissions_db.insert_submission(
             user_id=uid, org_id=user.get("org_id"), image_url=body.imageUrl,
             object_path=body.objectPath, file_name=body.fileName,
@@ -173,7 +174,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
     if status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle):
-        status, points = "duplicate", 0
+        status, points = "duplicate", settings.points_duplicate
 
     row = submissions_db.insert_submission(
         user_id=uid,
