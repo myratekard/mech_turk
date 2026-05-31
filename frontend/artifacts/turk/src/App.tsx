@@ -1,6 +1,7 @@
 import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ClerkProvider } from "@clerk/react";
+import { shadcn } from "@clerk/themes";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { ReactNode } from "react";
@@ -26,6 +27,56 @@ const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
 if (!clerkPubKey) throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY in artifacts/turk/.env");
+
+// Clerk sign-in/up theming — matches the Turk dashboard (dark + cyan), per the Replit design.
+const clerkAppearance = {
+  theme: shadcn,
+  cssLayerName: "clerk",
+  options: {
+    logoPlacement: "inside" as const,
+    logoLinkUrl: basePath || "/",
+    logoImageUrl: `${window.location.origin}${basePath}/logo.svg`,
+  },
+  variables: {
+    colorPrimary: "hsl(190 90% 50%)",
+    colorForeground: "hsl(0 0% 98%)",
+    colorMutedForeground: "hsl(240 10% 70%)",
+    colorDanger: "hsl(350 80% 60%)",
+    colorBackground: "hsl(240 35% 9%)",
+    colorInput: "hsl(240 30% 16%)",
+    colorInputForeground: "hsl(0 0% 98%)",
+    colorNeutral: "hsl(240 30% 16%)",
+    fontFamily: "'Outfit', sans-serif",
+    borderRadius: "0.5rem",
+  },
+  elements: {
+    rootBox: "w-full flex justify-center",
+    cardBox: "bg-[#15151e] border border-[#1c1c29] rounded-xl w-[440px] max-w-full overflow-hidden shadow-[0_0_30px_rgba(0,0,0,0.5)]",
+    card: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    footer: "!shadow-none !border-0 !bg-transparent !rounded-none",
+    headerTitle: "text-2xl font-black uppercase tracking-tight text-white",
+    headerSubtitle: "text-muted-foreground font-medium",
+    socialButtonsBlockButtonText: "text-foreground font-semibold",
+    formFieldLabel: "text-foreground font-semibold uppercase tracking-wider text-xs",
+    footerActionLink: "text-primary hover:text-primary/80 font-bold",
+    footerActionText: "text-muted-foreground",
+    dividerText: "text-muted-foreground uppercase text-xs font-bold",
+    identityPreviewEditButton: "text-primary",
+    formFieldSuccessText: "text-green-500",
+    alertText: "text-destructive",
+    logoBox: "flex justify-center mb-4",
+    logoImage: "h-12",
+    socialButtonsBlockButton: "border-border hover:bg-muted/50 transition-colors rounded-md",
+    formButtonPrimary: "bg-primary text-[#06060f] font-bold uppercase tracking-wider hover:bg-primary/90 transition-colors shadow-[0_0_15px_rgba(0,255,255,0.3)]",
+    formFieldInput: "bg-input border-border text-foreground rounded-md focus:ring-1 focus:ring-primary font-mono",
+    footerAction: "bg-muted/30 border-t border-border mt-4 py-4 rounded-b-xl",
+    dividerLine: "bg-border",
+    alert: "bg-destructive/10 border-destructive/20 text-destructive",
+    otpCodeFieldInput: "bg-input border-border text-foreground rounded-md",
+    formFieldRow: "mb-4",
+    main: "p-8",
+  },
+};
 
 type Role = "superuser" | "turk_admin" | "admin" | "user";
 
@@ -94,6 +145,7 @@ function App() {
   return (
     <ClerkProvider
       publishableKey={clerkPubKey}
+      appearance={clerkAppearance}
       signInForceRedirectUrl="/dashboard"
       signUpForceRedirectUrl="/dashboard"
     >
