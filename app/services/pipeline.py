@@ -12,8 +12,8 @@ from app.schemas.models import (
     ProfileArtifact,
     VisionAnalysis,
 )
-from app.services import fusion
-from app.services.cv_verifier import bgr_from_bytes, verify_badge_cv
+from app.services import badge_cv, fusion
+from app.services.badge_cv import bgr_from_bytes
 from app.services.store import ArtifactStore
 from app.services.vision_llm import analyze_screenshot
 
@@ -50,19 +50,19 @@ def analyze(
     # 1) Vision analysis (platform + verdict + fields) in one call
     va = analyze_screenshot(image_bytes, mime=mime)
 
-    # 2) Independent CV cross-check of the tick
+    # 2) Independent CV second opinion: template-match the verified tick
     bgr = bgr_from_bytes(image_bytes)
-    cv_signal = verify_badge_cv(bgr, va.platform, va.badge_bbox)
+    cv_signal = badge_cv.detect(bgr)
 
     # 3) Fuse the two signals (lenient policy)
     llm_signal = fusion.to_llm_signal(va)
     verification = fusion.fuse(llm_signal, cv_signal, badge_bbox=va.badge_bbox)
 
-    if llm_signal.is_verified != cv_signal.matched:
+    if cv_signal.method != "unavailable" and llm_signal.is_verified != cv_signal.matched:
         warnings.append(
             f"Signal disagreement: LLM verified={llm_signal.is_verified} "
             f"(conf {llm_signal.confidence}), CV matched={cv_signal.matched} "
-            f"(score {cv_signal.score})."
+            f"(score {cv_signal.score}) — routed to review."
         )
     if va.platform == "unknown":
         warnings.append("Platform could not be confidently identified.")

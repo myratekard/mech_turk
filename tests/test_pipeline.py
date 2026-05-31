@@ -34,8 +34,8 @@ def _llm(v, c):
     return LLMSignal(is_verified=v, confidence=c)
 
 
-def _cv(m, s):
-    return CVSignal(matched=m, score=s)
+def _cv(m, s, method="template"):
+    return CVSignal(matched=m, score=s, method=method)
 
 
 def test_fuse_both_agree_high_confidence_no_review():
@@ -45,37 +45,44 @@ def test_fuse_both_agree_high_confidence_no_review():
     assert r.confidence >= 0.8
 
 
-def test_fuse_llm_only_high_conf_no_review():
-    # High-confidence LLM is the trusted authority -> accept without review.
+def test_fuse_disagreement_llm_yes_cv_no_routes_to_review():
+    # Second opinion disagrees with the LLM -> candidate, but a human reconciles.
     r = fusion.fuse(_llm(True, 0.9), _cv(False, 0.2))
-    assert r.verified is True
-    assert r.needs_review is False
-
-
-def test_fuse_llm_only_mid_conf_flags_review():
-    # Above LLM_CONF_MIN but below LLM_CONF_HIGH -> accept but flag for review.
-    r = fusion.fuse(_llm(True, 0.5), _cv(False, 0.2))
     assert r.verified is True
     assert r.needs_review is True
 
 
-def test_fuse_cv_template_only_accepts_but_flags_review():
-    # LLM missed but a precise template matched -> accept, flag for review.
+def test_fuse_disagreement_cv_yes_llm_no_routes_to_review():
+    # LLM missed but a precise template matched -> route to review (has caught LLM errors).
     r = fusion.fuse(_llm(False, 0.1), _cv(True, 0.95))
     assert r.verified is True
     assert r.needs_review is True
 
 
-def test_fuse_neither_rejects():
+def test_fuse_both_agree_not_verified_no_review():
     r = fusion.fuse(_llm(False, 0.1), _cv(False, 0.2))
     assert r.verified is False
     assert r.needs_review is False
 
 
-def test_fuse_low_conf_llm_ignored():
-    # LLM says verified but below LLM_CONF_MIN, CV also misses -> not verified
+def test_fuse_low_conf_llm_and_cv_miss_agree_not_verified():
+    # LLM says verified but below LLM_CONF_MIN -> treated as "no"; CV "no" too -> consensus no.
     r = fusion.fuse(_llm(True, 0.2), _cv(False, 0.1))
     assert r.verified is False
+    assert r.needs_review is False
+
+
+def test_fuse_cv_unavailable_falls_back_to_llm_high_conf():
+    # No templates / load error -> LLM is the sole authority.
+    r = fusion.fuse(_llm(True, 0.9), _cv(False, 0.0, method="unavailable"))
+    assert r.verified is True
+    assert r.needs_review is False
+
+
+def test_fuse_cv_unavailable_falls_back_to_llm_mid_conf_review():
+    r = fusion.fuse(_llm(True, 0.5), _cv(False, 0.0, method="unavailable"))
+    assert r.verified is True
+    assert r.needs_review is True
 
 
 # --------------------------- Integration (needs key) -------------------------

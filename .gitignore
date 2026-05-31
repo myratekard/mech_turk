@@ -8,6 +8,8 @@ artifacts/
 .pytest_cache/
 report*.json
 _label/
+# full-res personal screenshots used for CV iteration (don't commit ~300MB of user data)
+verify/samples/_fullres/
 
 # frontend monorepo
 frontend/**/node_modules/

@@ -50,17 +50,20 @@ Dashboard. Override the API target for the proxy with `VITE_API_TARGET`.
 ```
 screenshot ─► vision_llm (Gemini: platform + verdict + fields, one call)
                  │
-                 ├─► cv_verifier (template match + blue-disc/check heuristic on the badge region)
+                 ├─► badge_cv (independent SECOND OPINION: blue-disc localizer +
+                 │             sliding multi-scale template match vs badges/; F1=1.0
+                 │             cross-domain on full-res + WhatsApp-compressed)
                  │
-                 └─► fusion (lenient: 1 signal = accept+needs_review; 2 = high confidence)
+                 └─► fusion (consensus: agree → decide; disagree → review queue)
                         │
                         └─► pipeline (gate extraction on verified) ─► store (JSON + evidence crop)
 ```
 
 Code lives in `app/`:
 - `services/vision_llm.py` — Gemini vision call (`gemini-2.5-flash`, structured output).
-- `services/cv_verifier.py` — independent CV confirmation of the tick (adapted from `verify/verify.py`).
-- `services/fusion.py` — lenient signal fusion.
+- `services/badge_cv.py` — CV second-opinion badge detector (template match vs `badges/`); the
+  live CV signal. (`services/cv_verifier.py` is the earlier heuristic, retained for `tools/`.)
+- `services/fusion.py` — consensus fusion (LLM + CV agree → decide, disagree → review).
 - `services/pipeline.py` — orchestration + extraction gate.
 - `services/store.py` — local JSON artifact store (R2/Mongo can drop in later).
 - `schemas/models.py` — Pydantic models (`AnalysisResult`, `ProfileArtifact`, …).

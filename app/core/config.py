@@ -34,6 +34,9 @@ class Settings:
     llm_conf_high: float = float(os.getenv("LLM_CONF_HIGH", "0.75"))
     # LLM verification_confidence below which the LLM signal is ignored entirely.
     llm_conf_min: float = float(os.getenv("LLM_CONF_MIN", "0.40"))
+    # Template-match score at/above which the CV second opinion asserts a verified badge.
+    # 0.76 = the clean badge/non-badge split validated on full-res + WhatsApp-compressed sets.
+    badge_cv_threshold: float = float(os.getenv("BADGE_CV_THRESHOLD", "0.76"))
 
     # Where analyzed artifacts (JSON + badge crops) are written
     artifact_dir: str = os.getenv("ARTIFACT_DIR", "artifacts")

@@ -1,24 +1,26 @@
 # Badge templates
 
-Per-platform verified-badge templates used by `app/services/cv_verifier.py` for the
-**corroborating** template-match signal: `instagram.png`, `x.png`, `tiktok.png`.
+Per-platform verified-badge templates used by `app/services/badge_cv.py` as an independent
+**second opinion** to the LLM. 15 grayscale 40×40 crops are committed: `instagram.png`,
+`x.png`, `tiktok.png` plus harvested variants `*_h0..3.png`.
 
-## Status
+## How it works
 
-Currently **empty**. The CV cross-check only asserts a match on a precise template hit
-(the loose blue-disc heuristic is audit-only — on the sample set it scored precision 0,
-firing on blue emojis / LIVE rings / Follow buttons). With no templates present, the CV
-signal is inert and the verdict rests on the LLM, which scores 1.0 precision/recall on
-the labeled set. Templates only *raise confidence / clear `needs_review`* when they agree
-with the LLM; they never override it.
+`badge_cv.detect()` localizes blue, roundish, filled discs in the top band of the screenshot,
+then lets each template **slide** over a padded patch at several scales and takes the best
+`TM_CCOEFF_NORMED` score. A match is asserted at `BADGE_CV_THRESHOLD` (default **0.76**) — the
+clean badge/non-badge split validated cross-domain (full-res iPhone + WhatsApp-compressed):
+precision = recall = F1 = **1.0** on both sets. See `tools/cv_tmpl.py` for the iteration/eval
+harness and `tests/test_badge_cv.py` for the regression check.
 
-## How to generate
+## Fusion
 
-Clean, tightly-cropped badge images are needed (the LLM bounding box is not pixel-accurate,
-so auto-cropping from a screenshot tends to miss). Either:
+The CV verdict is fused with the LLM as consensus (`app/services/fusion.py`): when both agree,
+the verdict is decided directly; when they **disagree**, the submission is routed to the review
+queue (`needs_review`). The detector has caught LLM mislabels in testing.
 
-1. Manually crop the badge from a high-res verified screenshot (~24–32 px square), or
-2. Use `python tools/make_badges.py --instagram <img> --x <img> --tiktok <img>` and then
-   **visually verify** each output actually shows the badge before keeping it.
+## Regenerating / adding templates
 
-Tune `CV_MATCH_THRESHOLD` in `.env` once templates exist.
+- Seed from full-res confirmed badges: `python tools/cv_tmpl.py` (writes `instagram/x/tiktok.png`).
+- Harvest more variants for margin: `python -m tools.harvest_templates`.
+- Tune `BADGE_CV_THRESHOLD` in `.env` if the operating point needs adjusting.
