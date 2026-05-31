@@ -240,15 +240,16 @@ function PointsBreakdown({ breakdown, total }: { breakdown?: BreakdownEntry[]; t
 
 function StatCard({ title, value, icon: Icon, color, loading }: { title: string, value?: number, icon: any, color: string, loading: boolean }) {
   return (
-    <div className="bg-card border border-border rounded-xl p-6 relative overflow-hidden group">
-      <div className={`absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity ${color}`}>
-        <Icon size={64} />
+    <div className="bg-card border border-border rounded-xl p-4 md:p-6 relative overflow-hidden group">
+      <div className={`absolute top-0 right-0 p-4 md:p-6 opacity-10 group-hover:opacity-20 transition-opacity ${color}`}>
+        <Icon size={48} className="md:hidden" />
+        <Icon size={64} className="hidden md:block" />
       </div>
-      <h3 className="text-sm font-bold text-muted-foreground uppercase tracking-wider mb-2">{title}</h3>
+      <h3 className="text-[10px] md:text-sm font-bold text-muted-foreground uppercase tracking-wider mb-1 md:mb-2 leading-tight">{title}</h3>
       {loading ? (
-        <Skeleton className="h-10 w-24 bg-muted/50" />
+        <Skeleton className="h-8 md:h-10 w-16 md:w-24 bg-muted/50" />
       ) : (
-        <div className="text-4xl font-black font-mono tracking-tighter">
+        <div className="text-2xl md:text-4xl font-black font-mono tracking-tighter">
           {value !== undefined ? value.toLocaleString() : "0"}
         </div>
       )}
