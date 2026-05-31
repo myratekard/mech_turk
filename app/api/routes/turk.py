@@ -156,9 +156,11 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
         return _row_to_submission(row)
 
     # 3) Novel image -> run the engine (the only path that spends tokens).
+    #    force_profile=True keeps the fields the LLM already extracted in this same call even
+    #    when the verdict isn't "verified" — so a later invalid->accepted dispute needs NO re-run.
     mime, _ = mimetypes.guess_type(body.fileName or body.objectPath)
     try:
-        result = run_pipeline(data, mime=mime or "image/jpeg", persist=False)
+        result = run_pipeline(data, mime=mime or "image/jpeg", persist=False, force_profile=True)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Analysis failed: {e}")
 
@@ -166,6 +168,8 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     platform = body.platform or platform_label(result)
 
     # Account-level duplicate (same platform+handle already captured) earns no points.
+    # acct_platform/acct_handle are stored for every verdict (not just accepted) so the handle
+    # is available if the submission is later disputed and approved.
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
     if status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle):

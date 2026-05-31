@@ -75,9 +75,10 @@ def approve(submission_id: int, user: dict = Depends(_reviewer)):
 
     acct_platform, acct_handle = row.get("acct_platform"), row.get("acct_handle")
     analysis_json, update_acct = None, False
-    # Overturning a record that was never extracted (e.g. a disputed 'invalid'): re-extract so
-    # the accepted capture has its profile/handle and can be duplicate-checked. force_profile
-    # extracts fields even though the engine verdict wasn't "verified" (the reviewer overrides).
+    # Intake now stores the extracted handle on every verdict, so a disputed 'invalid' already
+    # has it. This re-extract is a FALLBACK only — for legacy rows captured before that change,
+    # or rows where extraction genuinely found no handle. force_profile extracts fields even
+    # though the engine verdict wasn't "verified" (the reviewer overrides).
     if not acct_handle:
         data = storage.read_object(row["object_path"])
         if data is not None:
