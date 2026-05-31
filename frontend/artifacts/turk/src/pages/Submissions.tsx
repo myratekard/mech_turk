@@ -22,25 +22,36 @@ export default function Submissions() {
   const queryClient = useQueryClient();
   const limit = 10;
 
+  const params = {
+    page,
+    limit,
+    ...(statusFilter !== "all" ? { status: statusFilter } : {}),
+  };
+
   async function handleDispute(id: number) {
     if (!confirm("Dispute this decision? It will be sent back for human review. You can only dispute a submission once.")) return;
     setDisputingId(id);
     setDisputeError(null);
     try {
       await api.disputeSubmission(id);
-      await queryClient.invalidateQueries(); // refresh the submissions list (+ dashboard counts)
+      // Reflect the new state immediately so the row flips to DISPUTED / the button is gone.
+      queryClient.setQueryData(getListSubmissionsQueryKey(params), (old: any) =>
+        old
+          ? {
+              ...old,
+              submissions: old.submissions.map((s: any) =>
+                s.id === id ? { ...s, status: "in_review", disputed: true } : s,
+              ),
+            }
+          : old,
+      );
+      await queryClient.invalidateQueries(); // sync list + dashboard counts with the server
     } catch (e: any) {
       setDisputeError(e?.message || "Failed to dispute submission.");
     } finally {
       setDisputingId(null);
     }
   }
-
-  const params = {
-    page,
-    limit,
-    ...(statusFilter !== "all" ? { status: statusFilter } : {}),
-  };
 
   const { data, isLoading } = useListSubmissions(params, {
     query: {
@@ -57,6 +68,7 @@ export default function Submissions() {
       case "duplicate": return "bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20";
       case "unsupported": return "bg-slate-500/10 text-slate-500 border-slate-500/20";
       case "processed": return "bg-blue-500/10 text-blue-500 border-blue-500/20";
+      case "disputed": return "bg-violet-500/10 text-violet-500 border-violet-500/20";
       default: return "bg-muted text-muted-foreground";
     }
   };
@@ -64,6 +76,9 @@ export default function Submissions() {
   const getStatusLabel = (status: string) => {
     return status.replace("_", " ").toUpperCase();
   };
+
+  // A disputed row is shown as DISPUTED (it sits in the review queue) until a reviewer decides.
+  const displayStatus = (sub: any) => (sub.disputed ? "disputed" : sub.status);
 
   const totalPages = data ? Math.ceil(data.total / limit) : 1;
 
@@ -157,8 +172,8 @@ export default function Submissions() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <Badge variant="outline" className={getStatusColor(sub.status)}>
-                          {getStatusLabel(sub.status)}
+                        <Badge variant="outline" className={getStatusColor(displayStatus(sub))}>
+                          {getStatusLabel(displayStatus(sub))}
                         </Badge>
                       </TableCell>
                       <TableCell>
@@ -172,7 +187,7 @@ export default function Submissions() {
                       </TableCell>
                       <TableCell className="text-right">
                         {(sub as any).disputed ? (
-                          <span className="text-xs font-mono text-muted-foreground uppercase">Disputed</span>
+                          <span className="text-xs text-muted-foreground">Awaiting review</span>
                         ) : DISPUTABLE.includes(sub.status) ? (
                           <Button
                             variant="outline"
