@@ -24,7 +24,7 @@ from app.schemas.api_models import (
     UploadUrlRequest,
     UploadUrlResponse,
 )
-from app.services import storage, submissions_db
+from app.services import image_gate, storage, submissions_db
 from app.services.imagehash import average_hash
 from app.services.pipeline import analyze as run_pipeline
 
@@ -36,10 +36,13 @@ _PLATFORM_LABEL = {"instagram": "Instagram", "x": "X", "tiktok": "TikTok", "unkn
 def map_status_points(result) -> tuple[str, int]:
     """Engine verdict -> (submission status, points). Shared with admin re-run.
 
+      not a profile shot -> unsupported (out of scope; not a profile page)
       verified           -> accepted (+points)
       low-confidence      -> in_review (needs a human look)
       not a verified acct -> invalid (rejected; we only want verified accounts)
     """
+    if not getattr(result, "is_profile_screenshot", True):
+        return "unsupported", 0
     v = result.verification
     if v.needs_review:
         return "in_review", 0
@@ -123,6 +126,16 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     if submissions_db.count_user_uploads_since(uid, since) >= settings.daily_upload_limit:
         raise HTTPException(status_code=429, detail="Daily upload limit reached. Try again later.")
 
+    # 1b) Cheap shape gate: reject obvious non-phone-screenshots before spending an LLM call.
+    reason = image_gate.check_phone_screenshot(data)
+    if reason:
+        row = submissions_db.insert_submission(
+            user_id=uid, org_id=user.get("org_id"), image_url=body.imageUrl,
+            object_path=body.objectPath, file_name=body.fileName,
+            platform=None, status="unsupported", points=0, analysis_json=None,
+        )
+        return _row_to_submission(row)
+
     # 2) Perceptual-hash pre-check: a re-uploaded / near-identical image skips the LLM
     #    entirely (no token spend). Re-uploading your own image is penalized.
     try:
@@ -193,8 +206,8 @@ def list_submissions(
 
 @router.post("/submissions/{submission_id}/dispute", response_model=Submission, tags=["submissions"])
 def dispute_submission(submission_id: int, user: dict = Depends(get_current_user)):
-    """Owner contests a decided submission (accepted/invalid/duplicate): send it back to
-    the review queue. Allowed once per submission."""
+    """Owner contests a decided submission (accepted or invalid): send it back to the
+    review queue. Allowed once per submission; duplicates cannot be disputed."""
     row, err = submissions_db.dispute_submission(str(user["id"]), submission_id)
     if err == "not_found":
         raise HTTPException(status_code=404, detail="Submission not found")
@@ -203,7 +216,7 @@ def dispute_submission(submission_id: int, user: dict = Depends(get_current_user
     if err == "not_disputable":
         raise HTTPException(
             status_code=400,
-            detail="Only decided submissions (accepted, invalid or duplicate) can be disputed.",
+            detail="Only accepted or invalid submissions can be disputed.",
         )
     return _row_to_submission(row)
 

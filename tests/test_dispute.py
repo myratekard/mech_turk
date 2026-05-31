@@ -38,6 +38,15 @@ def test_dispute_in_review_is_not_disputable():
     assert err == "not_disputable"
 
 
+def test_dispute_duplicate_is_not_disputable():
+    uid = f"test-{uuid.uuid4()}"
+    submissions_db.init_db()
+    sub = _insert(uid, "duplicate")
+    row, err = submissions_db.dispute_submission(uid, sub["id"])
+    assert row is None
+    assert err == "not_disputable"
+
+
 def test_dispute_other_users_submission_not_found():
     uid = f"test-{uuid.uuid4()}"
     submissions_db.init_db()

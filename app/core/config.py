@@ -38,6 +38,12 @@ class Settings:
     # 0.76 = the clean badge/non-badge split validated on full-res + WhatsApp-compressed sets.
     badge_cv_threshold: float = float(os.getenv("BADGE_CV_THRESHOLD", "0.76"))
 
+    # Cheap pre-LLM gate: reject obvious non-phone-screenshots (landscape/square/tiny) by
+    # aspect (height/width) + min short side, before spending a Gemini call.
+    screenshot_min_aspect: float = float(os.getenv("SCREENSHOT_MIN_ASPECT", "1.3"))
+    screenshot_max_aspect: float = float(os.getenv("SCREENSHOT_MAX_ASPECT", "3.0"))
+    screenshot_min_short_side: int = int(os.getenv("SCREENSHOT_MIN_SHORT_SIDE", "300"))
+
     # Where analyzed artifacts (JSON + badge crops) are written
     artifact_dir: str = os.getenv("ARTIFACT_DIR", "artifacts")
 

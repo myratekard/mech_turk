@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/layout/Shell";
 import { api, Analytics as AnalyticsData, UserStat } from "@/lib/api";
-import { BarChart3, Users as UsersIcon, Ban, CheckCircle2, XCircle, Clock, Zap, FileStack, Copy } from "lucide-react";
+import { BarChart3, Users as UsersIcon, Ban, CheckCircle2, XCircle, Clock, Zap, FileStack, Copy, ImageOff } from "lucide-react";
 
 function Stat({ title, value, icon: Icon, color }: { title: string; value?: number; icon: any; color: string }) {
   return (
@@ -21,6 +21,7 @@ const METRICS = [
   { key: "invalid", label: "Invalid", color: "bg-red-500" },
   { key: "inReview", label: "In Review", color: "bg-amber-500" },
   { key: "duplicate", label: "Duplicate", color: "bg-fuchsia-500" },
+  { key: "unsupported", label: "Unsupported", color: "bg-slate-500" },
   { key: "points", label: "Points", color: "bg-primary" },
 ] as const;
 
@@ -71,6 +72,7 @@ export default function Analytics() {
               <Stat title="Invalid" value={data.invalid} icon={XCircle} color="text-red-500" />
               <Stat title="In Review" value={data.inReview} icon={Clock} color="text-amber-500" />
               <Stat title="Duplicate" value={data.duplicate} icon={Copy} color="text-fuchsia-500" />
+              <Stat title="Unsupported" value={data.unsupported} icon={ImageOff} color="text-slate-500" />
               <Stat title="Users" value={data.users} icon={UsersIcon} color="text-primary" />
               <Stat title="Blocked Users" value={data.blockedUsers} icon={Ban} color="text-red-500" />
             </div>

@@ -44,6 +44,7 @@ class OrgAnalytics(BaseModel):
     invalid: int
     inReview: int
     duplicate: int = 0
+    unsupported: int = 0
     totalPoints: int
 
 
@@ -55,6 +56,7 @@ class UserStat(BaseModel):
     invalid: int
     inReview: int
     duplicate: int
+    unsupported: int = 0
     points: int
 
 

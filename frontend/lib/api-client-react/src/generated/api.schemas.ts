@@ -18,6 +18,7 @@ export const SubmissionStatus = {
   accepted: 'accepted',
   invalid: 'invalid',
   duplicate: 'duplicate',
+  unsupported: 'unsupported',
 } as const;
 
 export interface Submission {
@@ -34,6 +35,7 @@ export interface Submission {
   platform?: string | null;
   status: SubmissionStatus;
   points: number;
+  disputed?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -64,6 +66,7 @@ export interface DashboardSummary {
   processed: number;
   invalid: number;
   duplicate?: number;
+  unsupported?: number;
   updatedToday: number;
 }
 
@@ -113,5 +116,6 @@ export const ListSubmissionsStatus = {
   accepted: 'accepted',
   invalid: 'invalid',
   duplicate: 'duplicate',
+  unsupported: 'unsupported',
 } as const;
 

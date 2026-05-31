@@ -9,7 +9,9 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel
 
-SubmissionStatus = Literal["in_review", "processed", "accepted", "invalid", "duplicate"]
+SubmissionStatus = Literal[
+    "in_review", "processed", "accepted", "invalid", "duplicate", "unsupported"
+]
 
 
 class HealthStatus(BaseModel):
@@ -52,6 +54,7 @@ class DashboardSummary(BaseModel):
     processed: int
     invalid: int
     duplicate: int = 0
+    unsupported: int = 0
     updatedToday: int
 
 

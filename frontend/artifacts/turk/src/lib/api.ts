@@ -53,6 +53,7 @@ export interface Analytics {
   invalid: number;
   inReview: number;
   duplicate?: number;
+  unsupported?: number;
   totalPoints: number;
 }
 
@@ -64,6 +65,7 @@ export interface UserStat {
   invalid: number;
   inReview: number;
   duplicate: number;
+  unsupported: number;
   points: number;
 }
 export interface Org {

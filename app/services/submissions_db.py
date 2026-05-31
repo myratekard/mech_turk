@@ -146,6 +146,7 @@ def analytics(org_id: Optional[int] = None) -> dict:
         "invalid": sum(1 for r in rows if r["status"] == "invalid"),
         "inReview": sum(1 for r in rows if r["status"] == "in_review"),
         "duplicate": sum(1 for r in rows if r["status"] == "duplicate"),
+        "unsupported": sum(1 for r in rows if r["status"] == "unsupported"),
         "totalPoints": sum(r["points"] for r in rows),
     }
 
@@ -164,6 +165,7 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
                    SUM(status='invalid')   AS invalid,
                    SUM(status='in_review') AS in_review,
                    SUM(status='duplicate') AS duplicate,
+                   SUM(status='unsupported') AS unsupported,
                    COALESCE(SUM(points),0) AS points
             FROM submissions {where}
             GROUP BY user_id
@@ -174,7 +176,8 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
         {
             "user_id": r["user_id"], "total": r["total"], "accepted": r["accepted"] or 0,
             "invalid": r["invalid"] or 0, "in_review": r["in_review"] or 0,
-            "duplicate": r["duplicate"] or 0, "points": r["points"] or 0,
+            "duplicate": r["duplicate"] or 0, "unsupported": r["unsupported"] or 0,
+            "points": r["points"] or 0,
         }
         for r in rows
     ]
@@ -244,7 +247,9 @@ def update_submission_status(
 
 
 # Final states an uploader may contest into the review queue.
-DISPUTABLE_STATUSES = ("accepted", "invalid", "duplicate")
+# Duplicates are intentionally excluded — a re-capture of an already-accepted account
+# has nothing to overturn (the original capture stands).
+DISPUTABLE_STATUSES = ("accepted", "invalid")
 
 
 def dispute_submission(user_id: str, submission_id: int) -> Tuple[Optional[dict], Optional[str]]:
@@ -324,6 +329,7 @@ def dashboard_summary(user_id: str) -> dict:
     processed = sum(1 for r in rows if r["status"] == "processed")
     invalid = sum(1 for r in rows if r["status"] == "invalid")
     duplicate = sum(1 for r in rows if r["status"] == "duplicate")
+    unsupported = sum(1 for r in rows if r["status"] == "unsupported")
     updated_today = sum(1 for r in rows if (r["updated_at"] or "").startswith(today))
     return {
         "totalPoints": total_points,
@@ -333,5 +339,6 @@ def dashboard_summary(user_id: str) -> dict:
         "processed": processed,
         "invalid": invalid,
         "duplicate": duplicate,
+        "unsupported": unsupported,
         "updatedToday": updated_today,
     }

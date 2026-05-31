@@ -72,11 +72,33 @@ def approve(submission_id: int, user: dict = Depends(_reviewer)):
     row = submissions_db.get_submission_any(submission_id)
     if not row:
         raise HTTPException(status_code=404, detail="Submission not found")
-    # Approving a duplicate of an already-captured account still earns no points.
-    if submissions_db.is_duplicate_capture(row["acct_platform"], row["acct_handle"], exclude_id=submission_id):
-        updated = submissions_db.update_submission_status(submission_id, "duplicate", 0)
+
+    acct_platform, acct_handle = row.get("acct_platform"), row.get("acct_handle")
+    analysis_json, update_acct = None, False
+    # Overturning a record that was never extracted (e.g. a disputed 'invalid'): re-extract so
+    # the accepted capture has its profile/handle and can be duplicate-checked. force_profile
+    # extracts fields even though the engine verdict wasn't "verified" (the reviewer overrides).
+    if not acct_handle:
+        data = storage.read_object(row["object_path"])
+        if data is not None:
+            mime, _ = mimetypes.guess_type(row["file_name"] or row["object_path"])
+            result = run_pipeline(data, mime=mime or "image/jpeg", persist=False, force_profile=True)
+            acct_platform = result.platform if result.platform != "unknown" else None
+            acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
+            analysis_json, update_acct = result.model_dump_json(), True
+
+    # A duplicate of an already-captured account is recorded but earns no points.
+    if submissions_db.is_duplicate_capture(acct_platform, acct_handle, exclude_id=submission_id):
+        submissions_db.update_submission_status(
+            submission_id, "duplicate", 0, analysis_json=analysis_json,
+            acct_platform=acct_platform, acct_handle=acct_handle, update_acct=update_acct,
+        )
         return {"ok": True, "id": submission_id, "status": "duplicate", "points": 0}
-    submissions_db.update_submission_status(submission_id, "accepted", settings.points_accepted)
+
+    submissions_db.update_submission_status(
+        submission_id, "accepted", settings.points_accepted, analysis_json=analysis_json,
+        acct_platform=acct_platform, acct_handle=acct_handle, update_acct=update_acct,
+    )
     return {"ok": True, "id": submission_id, "status": "accepted", "points": settings.points_accepted}
 
 
@@ -274,7 +296,8 @@ def analytics_per_user(user: dict = Depends(_analytics_roles)):
             userId=int(s["user_id"]) if str(s["user_id"]).isdigit() else 0,
             username=u["username"] if u else f"user:{s['user_id']}",
             total=s["total"], accepted=s["accepted"], invalid=s["invalid"],
-            inReview=s["in_review"], duplicate=s["duplicate"], points=s["points"],
+            inReview=s["in_review"], duplicate=s["duplicate"],
+            unsupported=s["unsupported"], points=s["points"],
         ))
     out.sort(key=lambda x: x.total, reverse=True)
     return out

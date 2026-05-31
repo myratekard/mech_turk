@@ -79,6 +79,16 @@ class VisionAnalysis(BaseModel):
     platform: Platform = Field(description="Which platform layout this screenshot shows")
     platform_confidence: float = Field(ge=0.0, le=1.0)
 
+    # Classify the image kind FIRST: only a single profile page is in scope.
+    is_profile_screenshot: bool = Field(
+        default=True,
+        description=(
+            "True only if this is a screenshot of ONE social-media PROFILE page "
+            "(Instagram/X/TikTok). False for anything else: a feed/post/DM/search-result, "
+            "a web or desktop capture, a photo, meme, document, or any non-profile UI."
+        ),
+    )
+
     # Reasoning-FIRST: the model must describe what sits next to the name BEFORE
     # committing to the boolean. This field is intentionally ordered before
     # is_verified so structured generation produces the observation first.
@@ -140,6 +150,7 @@ class AnalysisResult(BaseModel):
     created_at: str
     platform: Platform
     platform_confidence: float
+    is_profile_screenshot: bool = True
     verification: VerificationResult
     profile: Optional[ProfileArtifact] = None  # populated only when verified
     source_image_ref: Optional[str] = None

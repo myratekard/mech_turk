@@ -41,8 +41,13 @@ def analyze(
     mime: str = "image/jpeg",
     store: Optional[ArtifactStore] = None,
     persist: bool = True,
+    force_profile: bool = False,
 ) -> AnalysisResult:
-    """Full pipeline: vision LLM -> CV cross-check -> fuse -> (gated) extract -> persist."""
+    """Full pipeline: vision LLM -> CV cross-check -> fuse -> (gated) extract -> persist.
+
+    force_profile=True extracts the profile even when the verdict isn't "verified" — used
+    when a reviewer overturns a rejection and we need the handle to complete the capture.
+    """
     analysis_id = str(uuid.uuid4())
     created_at = datetime.now(timezone.utc).isoformat()
     warnings: List[str] = []
@@ -67,14 +72,15 @@ def analyze(
     if va.platform == "unknown":
         warnings.append("Platform could not be confidently identified.")
 
-    # 4) Extraction gate — only keep profile when verified
-    profile = _build_profile(va) if verification.verified else None
+    # 4) Extraction gate — keep profile when verified (or when forced, e.g. reviewer override)
+    profile = _build_profile(va) if (verification.verified or force_profile) else None
 
     result = AnalysisResult(
         id=analysis_id,
         created_at=created_at,
         platform=va.platform,
         platform_confidence=va.platform_confidence,
+        is_profile_screenshot=va.is_profile_screenshot,
         verification=verification,
         profile=profile,
         warnings=warnings,
