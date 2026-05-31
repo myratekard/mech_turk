@@ -87,6 +87,9 @@ class Settings:
     mongo_uri: str = os.getenv("MONGO_URI", "")
     mongo_db: str = os.getenv("MONGO_DB", "mech_turk")
     db_backend: str = os.getenv("DB_BACKEND", "")   # "sqlite" | "mongo" | "" → auto
+    # Prefix all mech_turk collections (e.g. "turk_") when sharing a database with another
+    # app, so our users/submissions/counters don't collide with theirs.
+    mongo_collection_prefix: str = os.getenv("MONGO_COLLECTION_PREFIX", "")
 
     # --- Object storage: local disk (dev) vs Cloudflare R2 (deployed) ---
     cloudflare_access_key_id: str = os.getenv("CLOUDFLARE_ACCESS_KEY_ID", "")

@@ -14,7 +14,7 @@ from pymongo import ASCENDING
 
 from app.core.config import settings
 from app.services.auth import hash_password
-from app.services.mongo_client import clean, db, next_id
+from app.services.mongo_client import clean, col, next_id
 
 
 def _now() -> str:
@@ -22,19 +22,19 @@ def _now() -> str:
 
 
 def _users():
-    return db()["users"]
+    return col("users")
 
 
 def _orgs():
-    return db()["organizations"]
+    return col("organizations")
 
 
 def _clerk_orgs():
-    return db()["clerk_orgs"]
+    return col("clerk_orgs")
 
 
 def _invites():
-    return db()["turk_admin_invites"]
+    return col("turk_admin_invites")
 
 
 def _slugify(name: str) -> str:
