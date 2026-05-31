@@ -10,8 +10,8 @@ import mimetypes
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from fastapi.responses import JSONResponse
 
 from app.api.deps import get_current_user
 from app.core.config import settings
@@ -83,11 +83,12 @@ async def upload_object(object_id: str, request: Request):
 
 @router.get("/storage/objects/{object_path:path}", tags=["Storage"])
 def get_storage_object(object_path: str):
-    f = storage.object_file(object_path.split("/")[-1])
-    if not f:
+    object_id = object_path.split("/")[-1]
+    data = storage.read_object(object_id)  # works for local disk and R2
+    if data is None:
         return JSONResponse(status_code=404, content={"error": "Object not found"})
-    media_type, _ = mimetypes.guess_type(str(f))
-    return FileResponse(str(f), media_type=media_type or "application/octet-stream")
+    media_type, _ = mimetypes.guess_type(object_id)
+    return Response(content=data, media_type=media_type or "application/octet-stream")
 
 
 @router.get("/storage/public-objects/{file_path:path}", tags=["Storage"])

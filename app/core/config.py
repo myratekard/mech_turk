@@ -83,5 +83,34 @@ class Settings:
     # Directory of per-platform badge templates (instagram.png, x.png, tiktok.png)
     badges_dir: str = os.getenv("BADGES_DIR", "badges")
 
+    # --- Persistence: SQLite (local dev default) vs MongoDB (deployed) ---
+    mongo_uri: str = os.getenv("MONGO_URI", "")
+    mongo_db: str = os.getenv("MONGO_DB", "mech_turk")
+    db_backend: str = os.getenv("DB_BACKEND", "")   # "sqlite" | "mongo" | "" → auto
+
+    # --- Object storage: local disk (dev) vs Cloudflare R2 (deployed) ---
+    cloudflare_access_key_id: str = os.getenv("CLOUDFLARE_ACCESS_KEY_ID", "")
+    cloudflare_secret_key: str = os.getenv("CLOUDFLARE_SECRET_KEY", "")
+    cloudflare_endpoint: str = os.getenv("CLOUDFLARE_ENDPOINT", "")
+    cloudflare_bucket: str = os.getenv("CLOUDFLARE_BUCKET", "")
+    cloudflare_cdn_url: str = os.getenv("CLOUDFLARE_CDN_URL", "")
+
+    @property
+    def use_mongo(self) -> bool:
+        """MongoDB when DB_BACKEND=mongo, or auto-on whenever a MONGO_URI is configured."""
+        if self.db_backend == "mongo":
+            return True
+        if self.db_backend == "sqlite":
+            return False
+        return bool(self.mongo_uri)
+
+    @property
+    def use_r2(self) -> bool:
+        """Cloudflare R2 when its credentials + bucket are configured, else local disk."""
+        return bool(
+            self.cloudflare_access_key_id and self.cloudflare_secret_key
+            and self.cloudflare_endpoint and self.cloudflare_bucket
+        )
+
 
 settings = Settings()

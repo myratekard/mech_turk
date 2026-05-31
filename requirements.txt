@@ -9,6 +9,10 @@ pillow
 opencv-python-headless
 numpy
 pyjwt
+# persistence + object storage for deployment (SQLite/local disk stay the dev default)
+pymongo>=4.6
+boto3>=1.34
 # optional tracing (mirrors myratekard-ai)
 langsmith
 pytest
+mongomock  # test-only: exercise the Mongo store without a live server
