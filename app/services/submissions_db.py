@@ -59,6 +59,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE submissions ADD COLUMN acct_handle TEXT")
         if "image_hash" not in cols:
             conn.execute("ALTER TABLE submissions ADD COLUMN image_hash TEXT")
+        if "disputed" not in cols:
+            conn.execute("ALTER TABLE submissions ADD COLUMN disputed INTEGER NOT NULL DEFAULT 0")
 
 
 def insert_submission(
@@ -239,6 +241,36 @@ def update_submission_status(
         conn.execute(f"UPDATE submissions SET {', '.join(sets)} WHERE id=?", params)
         row = conn.execute("SELECT * FROM submissions WHERE id=?", (submission_id,)).fetchone()
     return dict(row) if row else None
+
+
+# Final states an uploader may contest into the review queue.
+DISPUTABLE_STATUSES = ("accepted", "invalid", "duplicate")
+
+
+def dispute_submission(user_id: str, submission_id: int) -> Tuple[Optional[dict], Optional[str]]:
+    """Owner contests a decided submission: move it back to the review queue, once only.
+
+    Returns (submission, error) where error is one of:
+    None (success) | "not_found" | "not_disputable" | "already_disputed".
+    """
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM submissions WHERE id=? AND user_id=?", (submission_id, user_id)
+        ).fetchone()
+        if row is None:
+            return None, "not_found"
+        if int(row["disputed"] or 0) == 1:
+            return None, "already_disputed"
+        if row["status"] not in DISPUTABLE_STATUSES:
+            return None, "not_disputable"
+        conn.execute(
+            "UPDATE submissions SET status='in_review', disputed=1, updated_at=? WHERE id=?",
+            (_now(), submission_id),
+        )
+        updated = conn.execute(
+            "SELECT * FROM submissions WHERE id=?", (submission_id,)
+        ).fetchone()
+    return dict(updated), None
 
 
 def list_submissions(

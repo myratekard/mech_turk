@@ -104,6 +104,7 @@ def _row_to_submission(row: dict) -> Submission:
         platform=row["platform"],
         status=row["status"],
         points=row["points"],
+        disputed=bool(row.get("disputed") or 0),
         createdAt=row["created_at"],
         updatedAt=row["updated_at"],
     )
@@ -188,6 +189,23 @@ def list_submissions(
         page=page,
         limit=limit,
     )
+
+
+@router.post("/submissions/{submission_id}/dispute", response_model=Submission, tags=["submissions"])
+def dispute_submission(submission_id: int, user: dict = Depends(get_current_user)):
+    """Owner contests a decided submission (accepted/invalid/duplicate): send it back to
+    the review queue. Allowed once per submission."""
+    row, err = submissions_db.dispute_submission(str(user["id"]), submission_id)
+    if err == "not_found":
+        raise HTTPException(status_code=404, detail="Submission not found")
+    if err == "already_disputed":
+        raise HTTPException(status_code=409, detail="This submission has already been disputed once.")
+    if err == "not_disputable":
+        raise HTTPException(
+            status_code=400,
+            detail="Only decided submissions (accepted, invalid or duplicate) can be disputed.",
+        )
+    return _row_to_submission(row)
 
 
 @router.get("/submissions/{submission_id}", response_model=Submission, tags=["submissions"])

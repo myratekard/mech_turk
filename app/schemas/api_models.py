@@ -25,6 +25,7 @@ class Submission(BaseModel):
     platform: Optional[str] = None
     status: SubmissionStatus
     points: int
+    disputed: bool = False
     createdAt: str
     updatedAt: str
 
