@@ -170,10 +170,15 @@ export default function Dashboard() {
                         <span className="text-primary font-bold">+{sub.points} PTS</span>
                       </div>
                     </div>
-                    <div>
+                    <div className="text-right">
                       <Badge variant="outline" className={getStatusColor(sub.status)}>
                         {getStatusLabel(sub.status)}
                       </Badge>
+                      {(sub as any).settled && (
+                        <div className="text-[10px] text-green-500 mt-1 flex items-center justify-end gap-1">
+                          <CheckCircle2 size={11} /> Settled{(sub as any).settledVia ? ` via ${(sub as any).settledVia}` : ""}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}

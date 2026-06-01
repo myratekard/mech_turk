@@ -68,6 +68,9 @@ def insert_submission(
         "acct_handle": acct_handle,
         "image_hash": image_hash,
         "disputed": 0,
+        "invoice_id": None,
+        "settled": 0,
+        "settled_at": None,
         "created_at": ts,
         "updated_at": ts,
     }
@@ -257,3 +260,64 @@ def dashboard_summary(user_id: str) -> dict:
         "updatedToday": updated_today,
         "pointsBreakdown": points_breakdown,
     }
+
+
+# ------------------------------------------------------------------- invoices
+INVOICEABLE_STATUSES = ("accepted", "duplicate")
+
+
+def _inv():
+    return col("invoices")
+
+
+def outstanding_summary(org_id: str) -> dict:
+    q = {"org_id": org_id, "invoice_id": None, "status": {"$in": list(INVOICEABLE_STATUSES)}}
+    rows = list(_c().find(q, {"_id": 0, "points": 1}))
+    return {"count": len(rows), "points": sum(r.get("points", 0) for r in rows)}
+
+
+def create_invoice(org_id: str, created_by) -> Optional[dict]:
+    ts = _now()
+    q = {"org_id": org_id, "invoice_id": None, "status": {"$in": list(INVOICEABLE_STATUSES)}}
+    rows = list(_c().find(q, {"_id": 0, "id": 1, "points": 1}))
+    if not rows:
+        return None
+    ids = [r["id"] for r in rows]
+    total = sum(r.get("points", 0) for r in rows)
+    inv = {
+        "id": next_id("invoices"), "org_id": org_id, "status": "pending",
+        "total_points": total, "submission_count": len(ids), "created_by": str(created_by),
+        "created_at": ts, "settled_by": None, "settled_at": None,
+    }
+    _inv().insert_one(inv)
+    _c().update_many({"id": {"$in": ids}}, {"$set": {"invoice_id": inv["id"]}})
+    return clean(inv)
+
+
+def list_invoices(org_id: Optional[str] = None) -> List[dict]:
+    q = {} if org_id is None else {"org_id": org_id}
+    return list(_inv().find(q, {"_id": 0}).sort("id", DESCENDING))
+
+
+def get_invoice(invoice_id: int) -> Optional[dict]:
+    inv = _inv().find_one({"id": invoice_id}, {"_id": 0})
+    if not inv:
+        return None
+    items = list(_c().find(
+        {"invoice_id": invoice_id},
+        {"_id": 0, "id": 1, "user_id": 1, "platform": 1, "acct_handle": 1, "status": 1, "points": 1, "created_at": 1},
+    ).sort("id", 1))
+    inv["items"] = items
+    return inv
+
+
+def settle_invoice(invoice_id: int, settled_by) -> Tuple[Optional[dict], Optional[str]]:
+    ts = _now()
+    inv = _inv().find_one({"id": invoice_id})
+    if not inv:
+        return None, "not_found"
+    if inv.get("status") == "settled":
+        return None, "already_settled"
+    _inv().update_one({"id": invoice_id}, {"$set": {"status": "settled", "settled_by": str(settled_by), "settled_at": ts}})
+    _c().update_many({"invoice_id": invoice_id}, {"$set": {"settled": 1, "settled_at": ts}})
+    return _inv().find_one({"id": invoice_id}, {"_id": 0}), None

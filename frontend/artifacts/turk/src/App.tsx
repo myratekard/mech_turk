@@ -21,6 +21,7 @@ import Users from "@/pages/admin/Users";
 import Staff from "@/pages/admin/Staff";
 import TurkAdmins from "@/pages/admin/TurkAdmins";
 import Analytics from "@/pages/admin/Analytics";
+import Invoices from "@/pages/admin/Invoices";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient();
@@ -135,6 +136,7 @@ function Router() {
       <Route path="/admin/turk-admins"><Protected roles={["superuser"]}><TurkAdmins /></Protected></Route>
       <Route path="/admin/users"><Protected roles={["superuser"]}><Users /></Protected></Route>
       <Route path="/admin/staff"><Protected roles={["admin"]}><Staff /></Protected></Route>
+      <Route path="/admin/invoices"><Protected roles={["superuser", "admin"]}><Invoices /></Protected></Route>
 
       <Route component={NotFound} />
     </Switch>

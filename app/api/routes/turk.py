@@ -98,7 +98,22 @@ def get_public_object(file_path: str):
 
 
 # ---------------------------------------------------------------------- submissions
+_ORG_NAME_CACHE: dict = {}
+
+
+def _org_name(org_id) -> Optional[str]:
+    """Cached Clerk-org display name (for the 'settled via {org}' note)."""
+    if not org_id:
+        return None
+    if org_id not in _ORG_NAME_CACHE:
+        from app.services import auth_db
+        org = auth_db.get_clerk_org(str(org_id))
+        _ORG_NAME_CACHE[org_id] = (org or {}).get("name")
+    return _ORG_NAME_CACHE[org_id]
+
+
 def _row_to_submission(row: dict) -> Submission:
+    settled = bool(row.get("settled") or 0)
     return Submission(
         id=row["id"],
         userId=row["user_id"],
@@ -109,6 +124,9 @@ def _row_to_submission(row: dict) -> Submission:
         status=row["status"],
         points=row["points"],
         disputed=bool(row.get("disputed") or 0),
+        settled=settled,
+        settledAt=row.get("settled_at"),
+        settledVia=_org_name(row.get("org_id")) if settled else None,
         createdAt=row["created_at"],
         updatedAt=row["updated_at"],
     )

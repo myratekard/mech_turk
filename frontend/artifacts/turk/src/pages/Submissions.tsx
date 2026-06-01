@@ -9,7 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, Activity, ExternalLink, Filter, Flag } from "lucide-react";
+import { ChevronLeft, ChevronRight, Activity, ExternalLink, Filter, Flag, CheckCircle2 } from "lucide-react";
 import type { ListSubmissionsStatus } from "@workspace/api-client-react";
 
 const DISPUTABLE = ["accepted", "invalid"];
@@ -177,6 +177,11 @@ export default function Submissions() {
                         <Badge variant="outline" className={getStatusColor(displayStatus(sub))}>
                           {getStatusLabel(displayStatus(sub))}
                         </Badge>
+                        {(sub as any).settled && (
+                          <div className="text-[10px] text-green-500 mt-1 flex items-center gap-1" title="Paid out to your organization">
+                            <CheckCircle2 size={11} /> Settled{(sub as any).settledVia ? ` via ${(sub as any).settledVia}` : ""}
+                          </div>
+                        )}
                       </TableCell>
                       <TableCell>
                         <span className="font-black font-mono text-primary tracking-tight">
