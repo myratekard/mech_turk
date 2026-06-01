@@ -24,7 +24,7 @@ import TurkAdmins from "@/pages/admin/TurkAdmins";
 import Analytics from "@/pages/admin/Analytics";
 import Invoices from "@/pages/admin/Invoices";
 import NotFound from "@/pages/not-found";
-import { OnboardingTour } from "@/components/OnboardingTour";
+import { TourOverlay } from "@/components/TourOverlay";
 
 const queryClient = new QueryClient();
 const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
@@ -169,11 +169,6 @@ function FirstRunRedirect() {
   return null;
 }
 
-// Show the first-time tour only to a signed-in, provisioned user (not on landing/login/denied).
-function TourGate() {
-  const { user, error } = useAuth();
-  return user && !error ? <OnboardingTour /> : null;
-}
 
 function App() {
   return (
@@ -189,7 +184,7 @@ function App() {
             <TooltipProvider>
               <Router />
               <FirstRunRedirect />
-              <TourGate />
+              <TourOverlay />
               <Toaster />
             </TooltipProvider>
           </AuthProvider>

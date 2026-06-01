@@ -186,7 +186,8 @@ export default function Upload() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <div 
+            <div
+              id="tour-dropzone"
               className={cn(
                 "border-2 border-dashed rounded-xl p-6 md:p-12 flex flex-col items-center justify-center text-center transition-all duration-200 relative overflow-hidden",
                 isDragging ? "border-primary bg-primary/5" : "border-border hover:border-primary/50 bg-card",

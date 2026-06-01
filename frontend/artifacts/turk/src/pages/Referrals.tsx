@@ -21,7 +21,7 @@ export default function Referrals() {
     <Shell>
       <div className="flex-1 p-6 md:p-8 max-w-3xl mx-auto w-full">
         <div className="mb-8">
-          <h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-2">
+          <h1 id="tour-referrals" className="text-3xl font-black uppercase tracking-tight flex items-center gap-2">
             <GitBranch className="text-primary" /> Referrals
           </h1>
           <p className="text-muted-foreground font-medium">Share your link — everyone who joins through it shows up here.</p>

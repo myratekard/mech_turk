@@ -131,7 +131,7 @@ export default function Submissions() {
           </div>
         )}
 
-        <div className="bg-card border border-border rounded-xl shadow-sm flex-1 flex flex-col overflow-hidden">
+        <div id="tour-submissions-list" className="bg-card border border-border rounded-xl shadow-sm flex-1 flex flex-col overflow-hidden">
           <div className="overflow-x-auto flex-1">
             <Table>
               <TableHeader className="bg-muted/30 sticky top-0 z-10">

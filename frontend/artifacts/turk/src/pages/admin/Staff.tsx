@@ -47,7 +47,7 @@ export default function Staff() {
     <Shell>
       <div className="flex-1 p-6 md:p-8 max-w-4xl mx-auto w-full">
         <div className="mb-8">
-          <h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-2">
+          <h1 id="tour-staff" className="text-3xl font-black uppercase tracking-tight flex items-center gap-2">
             <UsersIcon className="text-primary" /> Staff
           </h1>
           <p className="text-muted-foreground font-medium">
