@@ -38,8 +38,16 @@ def _templates() -> Tuple[np.ndarray, ...]:
     return tuple(out)
 
 
-def _blue(hsv: np.ndarray) -> np.ndarray:
-    return cv2.inRange(hsv, np.array([90, 90, 90]), np.array([125, 255, 255]))
+def _badge_mask(hsv: np.ndarray) -> np.ndarray:
+    """Localize candidate verified-badge discs by colour: blue (IG/X/TikTok individuals),
+    gold/amber (X businesses), and grey (X government/officials). The grayscale template
+    match is the real precision gate — this just proposes candidates."""
+    blue = cv2.inRange(hsv, np.array([90, 90, 90]), np.array([125, 255, 255]))
+    gold = cv2.inRange(hsv, np.array([16, 90, 120]), np.array([42, 255, 255]))
+    # Grey X badge is a blue-grey, not neutral grey — keep the band tight so generic grey
+    # UI elements aren't proposed (that wrecked blue-set precision).
+    grey = cv2.inRange(hsv, np.array([95, 22, 90]), np.array([120, 80, 195]))
+    return cv2.bitwise_or(cv2.bitwise_or(blue, gold), grey)
 
 
 def detect(bgr: np.ndarray) -> CVSignal:
@@ -51,7 +59,7 @@ def detect(bgr: np.ndarray) -> CVSignal:
     H, W = bgr.shape[:2]
     band = bgr[: int(H * _TOP_FRAC), :]
     hsv = cv2.cvtColor(band, cv2.COLOR_BGR2HSV)
-    mask = cv2.morphologyEx(_blue(hsv), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8), 1)
+    mask = cv2.morphologyEx(_badge_mask(hsv), cv2.MORPH_CLOSE, np.ones((3, 3), np.uint8), 1)
     gray = cv2.cvtColor(band, cv2.COLOR_BGR2GRAY)
     min_d, max_d = _MIN_DF * W, _MAX_DF * W
 
