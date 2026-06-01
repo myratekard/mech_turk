@@ -146,23 +146,25 @@ function Router() {
 }
 
 // New users land on the Instructions page on their first login. loginCount is incremented
-// by the backend on each new Clerk session, so loginCount <= 1 means "first sign-in". We only
-// redirect from the default landing spots ("/" or "/dashboard") and only once per browser, so
-// returning users and normal navigation are never hijacked.
-const FIRST_RUN_KEY = "turk_instructions_landed";
+// by the backend on each new Clerk session, so loginCount <= 1 means "first sign-in". The flag
+// is keyed PER USER (not per browser) so that signing into a different account on the same
+// machine still gets the first-run experience. We only redirect from the default landing spots
+// ("/" or "/dashboard"), so returning users and normal navigation are never hijacked.
+const firstRunKey = (id: string | number) => `turk_instructions_landed:${id}`;
 
 function FirstRunRedirect() {
   const { user, error, loading } = useAuth();
   const [location, navigate] = useLocation();
   useEffect(() => {
     if (loading || error || !user) return;
-    if (localStorage.getItem(FIRST_RUN_KEY)) return;
+    const key = firstRunKey(user.id);
+    if (localStorage.getItem(key)) return;
     if ((user.loginCount ?? 0) > 1) {
-      localStorage.setItem(FIRST_RUN_KEY, "1"); // returning user — don't bounce, just remember
+      localStorage.setItem(key, "1"); // returning user — don't bounce, just remember
       return;
     }
     if (location === "/" || location === "/dashboard") {
-      localStorage.setItem(FIRST_RUN_KEY, "1");
+      localStorage.setItem(key, "1");
       navigate("/instructions");
     }
   }, [user, error, loading, location, navigate]);

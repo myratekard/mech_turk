@@ -63,7 +63,18 @@ def _resolve_ref(code: str):
     if not clerk_org_id or not is_org_admin:
         return None  # users (non-admins) can't refer
     org = auth_db.get_clerk_org(clerk_org_id)
-    return inviter["id"], clerk_org_id, (org["name"] if org else None), inviter["username"]
+    org_name = org["name"] if org else None
+    if not org_name:
+        # Mirror missing/nameless (org not created via our create_org flow) — recover the
+        # name from Clerk so the invitee sees the org, not a generic fallback, and backfill.
+        try:
+            from app.services import clerk_api
+            org_name = clerk_api.get_organization(clerk_org_id).get("name")
+            if org_name:
+                auth_db.upsert_clerk_org(clerk_org_id, org_name)
+        except Exception:
+            pass
+    return inviter["id"], clerk_org_id, org_name, inviter["username"]
 
 
 @router.get("/ref/{code}", response_model=RefInfo)
