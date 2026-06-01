@@ -176,7 +176,7 @@ export function TourOverlay() {
     };
   }, [findTarget]);
 
-  const dismiss = useCallback(() => {
+  const markDone = useCallback(() => {
     if (user) {
       localStorage.setItem(doneKey(user.id), "1");
       sessionStorage.removeItem(stepKey(user.id));
@@ -184,13 +184,22 @@ export function TourOverlay() {
     setStep(null);
   }, [user]);
 
+  // Skip / close: end the tour where they are.
+  const dismiss = markDone;
+
+  // Finish (completed all steps): end the tour and return to the Instructions page.
+  const finish = useCallback(() => {
+    markDone();
+    navigate("/instructions");
+  }, [markDone, navigate]);
+
   const go = useCallback((next: number) => {
-    if (next >= steps.length) { dismiss(); return; }
+    if (next >= steps.length) { finish(); return; }
     if (user) sessionStorage.setItem(stepKey(user.id), String(next));
     setStep(next);
     const nextPage = steps[next].page;
     if (nextPage !== location) navigate(nextPage);
-  }, [location, navigate, dismiss, steps, user]);
+  }, [location, navigate, finish, steps, user]);
 
   if (!user || error) return null;
   if (step === null || localStorage.getItem(doneKey(user.id))) return null;

@@ -121,14 +121,15 @@ export default function Instructions() {
           </div>
 
           <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-3">
-            Examples — tap to enlarge
+            Examples — <span className="sm:hidden">swipe & tap to enlarge</span><span className="hidden sm:inline">tap to enlarge</span>
           </p>
-          <div className="flex flex-wrap justify-center gap-4 sm:gap-6">
+          {/* Mobile: horizontal swipe carousel (scroll-snap). sm+: centered wrap. */}
+          <div className="flex gap-4 sm:gap-6 overflow-x-auto snap-x snap-mandatory pb-3 -mx-6 px-6 sm:mx-0 sm:px-0 sm:flex-wrap sm:justify-center sm:overflow-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             {PROFILE_SCREENS.map(({ platform, Screen }) => (
               <Dialog key={platform}>
                 <DialogTrigger asChild>
                   <button
-                    className="group flex flex-col items-center gap-2 focus:outline-none"
+                    className="group flex flex-col items-center gap-2 focus:outline-none shrink-0 snap-center"
                     aria-label={`View ${platform} example screenshot`}
                   >
                     <div className="relative group-hover:scale-[1.03] transition-transform">
