@@ -40,6 +40,8 @@ export interface User {
   referredBy?: number | null;
   referralCode: string;
   blocked?: boolean;
+  loginCount?: number;
+  justLoggedIn?: boolean;
   createdAt: string;
 }
 

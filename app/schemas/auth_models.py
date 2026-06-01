@@ -27,6 +27,8 @@ class UserOut(BaseModel):
     referredBy: Optional[int] = None
     referralCode: str
     blocked: bool = False
+    loginCount: int = 0
+    justLoggedIn: bool = False   # transient: set by clerk_sync on a fresh session
     createdAt: str
 
 
