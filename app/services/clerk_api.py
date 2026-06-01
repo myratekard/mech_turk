@@ -49,6 +49,16 @@ def get_organization(org_id: str) -> dict:
     return _request("GET", f"/organizations/{org_id}")
 
 
+def find_user_by_email(email: str) -> Optional[dict]:
+    """Return the Clerk user with this email address, or None. Lets org creation add an
+    EXISTING user directly as admin (a sign-up invite would fail with 'email taken')."""
+    import urllib.parse
+    q = urllib.parse.quote(email)
+    res = _request("GET", f"/users?email_address={q}&limit=1")
+    users = res.get("data", res) if isinstance(res, dict) else res
+    return users[0] if users else None
+
+
 def get_user_org_memberships(clerk_user_id: str, limit: int = 10) -> list[dict]:
     """A user's organization memberships [{organization:{id,name}, role}, ...]. Used to
     provision an invited member even when their session token has no ACTIVE org set yet."""

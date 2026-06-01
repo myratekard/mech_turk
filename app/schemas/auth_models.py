@@ -75,6 +75,7 @@ class OrgOut(BaseModel):
     name: str
     createdAt: Optional[str] = None
     emailSent: Optional[bool] = None      # whether Clerk dispatched the admin invite
+    adminStatus: Optional[str] = None     # "invited" (emailed) | "added" (existing user made admin)
 
 
 class CreateOrgInput(BaseModel):

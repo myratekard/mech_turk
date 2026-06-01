@@ -78,6 +78,7 @@ export interface Org {
   name: string;
   createdAt?: string | null;
   emailSent?: boolean | null;
+  adminStatus?: string | null;   // "invited" | "added"
 }
 export interface RefInfo {
   valid: boolean;

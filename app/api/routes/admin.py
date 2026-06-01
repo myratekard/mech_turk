@@ -42,8 +42,9 @@ _staff_roles = require_roles("superuser", "admin")            # org-scoped staff
 
 
 def _to_org_out(clerk_org_id: str, name: str, created_at: str | None = None,
-                email_sent: bool | None = None) -> OrgOut:
-    return OrgOut(id=clerk_org_id, name=name, createdAt=created_at, emailSent=email_sent)
+                email_sent: bool | None = None, admin_status: str | None = None) -> OrgOut:
+    return OrgOut(id=clerk_org_id, name=name, createdAt=created_at, emailSent=email_sent,
+                  adminStatus=admin_status)
 
 
 def _row_to_review_item(row: dict) -> ReviewItem:
@@ -167,16 +168,27 @@ def create_org(body: CreateOrgInput, user: dict = Depends(require_superuser)):
         org = clerk_api.create_organization(body.name, created_by_clerk_id=user["clerk_id"])
         org_id = org["id"]
         auth_db.upsert_clerk_org(org_id, body.name)
-        email_sent = None
+        email_sent, admin_status = None, None
         if body.adminEmail:
-            clerk_api.create_organization_invitation(
-                org_id, body.adminEmail.strip(), role="org:admin", inviter_user_id=user["clerk_id"],
-                redirect_url=f"{settings.app_base_url.rstrip('/')}/register",
-            )
-            email_sent = True
+            adm = body.adminEmail.strip()
+            existing = clerk_api.find_user_by_email(adm)
+            if existing:
+                # Existing Clerk user: a sign-up invite would fail ("email taken"), so add them
+                # to the org directly as admin — they just sign in.
+                try:
+                    clerk_api.add_member(org_id, existing["id"], "org:admin")
+                except Exception:
+                    pass  # already a member -> fine
+                admin_status = "added"
+            else:
+                clerk_api.create_organization_invitation(
+                    org_id, adm, role="org:admin", inviter_user_id=user["clerk_id"],
+                    redirect_url=f"{settings.app_base_url.rstrip('/')}/register",
+                )
+                email_sent, admin_status = True, "invited"
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Clerk org creation failed: {e}")
-    return _to_org_out(org_id, body.name, email_sent=email_sent)
+    return _to_org_out(org_id, body.name, email_sent=email_sent, admin_status=admin_status)
 
 
 @router.get("/orgs", response_model=list[OrgOut])
