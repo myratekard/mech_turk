@@ -84,6 +84,8 @@ def _base_user_doc(*, username, email, password_hash, role, org_id, referred_by,
         "clerk_id": clerk_id,
         "clerk_org_id": None,
         "clerk_org_role": None,
+        "login_count": 0,
+        "last_session_id": None,
         "created_at": _now(),
     }
 
@@ -238,3 +240,16 @@ def get_user_by_referral_code(code: str) -> Optional[dict]:
 
 def list_orgs() -> List[dict]:
     return list(_orgs().find({}, {"_id": 0}).sort("id", ASCENDING))
+
+
+def record_login(user_id: int, session_id) -> tuple[int, bool]:
+    """Increment login_count on a NEW Clerk session id (refreshes reuse the sid)."""
+    u = _users().find_one({"id": user_id})
+    if not u:
+        return 0, False
+    count, last = int(u.get("login_count") or 0), u.get("last_session_id")
+    if session_id and session_id != last:
+        count += 1
+        _users().update_one({"id": user_id}, {"$set": {"login_count": count, "last_session_id": session_id}})
+        return count, True
+    return count, False

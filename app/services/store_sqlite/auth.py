@@ -79,6 +79,10 @@ def init_auth_db() -> None:
             conn.execute("ALTER TABLE users ADD COLUMN clerk_org_id TEXT")
         if "clerk_org_role" not in cols:
             conn.execute("ALTER TABLE users ADD COLUMN clerk_org_role TEXT")
+        if "login_count" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN login_count INTEGER NOT NULL DEFAULT 0")
+        if "last_session_id" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN last_session_id TEXT")
         # Superuser-issued platform admin (turk_admin) invitations, matched by email at sign-up.
         conn.execute(
             """
@@ -341,3 +345,18 @@ def list_orgs() -> List[dict]:
 # Invites are referral-code based now (see auth routes /register?ref=<code>); the
 # legacy `invites` table/functions were removed in favor of users.referral_code and
 # organizations.reg_code.
+
+
+def record_login(user_id: int, session_id) -> tuple[int, bool]:
+    """Increment login_count when a NEW Clerk session id is seen (refreshes reuse the sid,
+    so they don't count). Returns (login_count, is_new_session)."""
+    with _connect() as conn:
+        row = conn.execute("SELECT login_count, last_session_id FROM users WHERE id=?", (user_id,)).fetchone()
+        if not row:
+            return 0, False
+        count, last = int(row["login_count"] or 0), row["last_session_id"]
+        if session_id and session_id != last:
+            count += 1
+            conn.execute("UPDATE users SET login_count=?, last_session_id=? WHERE id=?", (count, session_id, user_id))
+            return count, True
+        return count, False

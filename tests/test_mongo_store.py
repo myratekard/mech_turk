@@ -93,6 +93,14 @@ def test_invoice_flow(mongo):
     assert sum(1 for r in rows if r.get("settled")) == 2
 
 
+def test_record_login_counts_distinct_sessions(mongo):
+    u = mauth.create_clerk_user(clerk_id="ckL", username="lia", email="l@x.com",
+                                role="user", org_id=None, referred_by=None)
+    assert mauth.record_login(u["id"], "sessA") == (1, True)
+    assert mauth.record_login(u["id"], "sessA") == (1, False)  # refresh, same session
+    assert mauth.record_login(u["id"], "sessB") == (2, True)   # new session
+
+
 def test_auth_no_seed_and_referrals(mongo):
     mauth.init_auth_db()
     # No superuser is seeded anymore — the DB starts empty.

@@ -35,8 +35,18 @@ def to_user_out(u: dict) -> UserOut:
         referredBy=u["referred_by"],
         referralCode=u["referral_code"],
         blocked=bool(u.get("blocked", 0)),
+        loginCount=int(u.get("login_count") or 0),
         createdAt=u["created_at"],
     )
+
+
+def _login_out(u: dict, claims: dict) -> UserOut:
+    """to_user_out + record this Clerk session as a login (justLoggedIn on a NEW session)."""
+    out = to_user_out(u)
+    count, is_new = auth_db.record_login(u["id"], (claims or {}).get("sid"))
+    out.loginCount = count
+    out.justLoggedIn = is_new
+    return out
 
 
 def _resolve_ref(code: str):
@@ -82,7 +92,7 @@ def clerk_sync(body: ClerkSyncInput, authorization: Optional[str] = Header(defau
     clerk_id = claims["sub"]
     existing = auth_db.get_user_by_clerk_id(clerk_id)
     if existing:
-        return to_user_out(existing)
+        return _login_out(existing, claims)
 
     email = (body.email or "").strip() or None
     org_id_claim, org_role_claim = org_from_claims(claims)
@@ -132,7 +142,7 @@ def clerk_sync(body: ClerkSyncInput, authorization: Optional[str] = Header(defau
         auth_db.set_user_clerk_org(user["id"], org_id_claim, org_role_claim)
         user["clerk_org_id"] = org_id_claim
 
-    return to_user_out(user)
+    return _login_out(user, claims)
 
 
 @router.get("/me", response_model=UserOut)
