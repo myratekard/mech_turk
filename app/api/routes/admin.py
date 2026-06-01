@@ -171,6 +171,9 @@ def create_org(body: CreateOrgInput, user: dict = Depends(require_superuser)):
         email_sent, admin_status = None, None
         if body.adminEmail:
             adm = body.adminEmail.strip()
+            # Authoritative: remember this email is the org's admin, matched at sign-in. This works
+            # regardless of whether the Clerk invite/membership flow carries over.
+            auth_db.add_pending_org_admin(adm, org_id)
             existing = clerk_api.find_user_by_email(adm)
             if existing:
                 # Existing Clerk user: a sign-up invite would fail ("email taken"), so add them

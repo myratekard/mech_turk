@@ -133,10 +133,16 @@ def clerk_sync(body: ClerkSyncInput, authorization: Optional[str] = Header(defau
     )
 
     role, referred_by, join_org = "user", None, None
+    pending_admin_org = auth_db.get_pending_org_admin(email)
     if is_superuser:
         role = "superuser"
     elif auth_db.is_pending_turk_admin(email):
         role = "turk_admin"
+    elif pending_admin_org:
+        # Superuser assigned this email as an org admin — provision as admin of that org
+        # (by email, no Clerk membership/invite required).
+        org_id_claim, org_role_claim = pending_admin_org, "org:admin"
+        auth_db.mark_org_admin_invite_used(email)
     elif body.ref:
         resolved = _resolve_ref(body.ref.strip())
         if resolved:
