@@ -296,6 +296,18 @@ def list_clerk_orgs() -> List[dict]:
     return [dict(r) for r in rows]
 
 
+def delete_clerk_org(clerk_org_id: str) -> None:
+    """Remove an org's local footprint: the label mirror, the pending-admin assignment,
+    and detach any users currently mirrored to it."""
+    with _connect() as conn:
+        conn.execute("DELETE FROM clerk_orgs WHERE clerk_org_id=?", (clerk_org_id,))
+        conn.execute("DELETE FROM pending_org_admins WHERE clerk_org_id=?", (clerk_org_id,))
+        conn.execute(
+            "UPDATE users SET clerk_org_id=NULL, clerk_org_role=NULL WHERE clerk_org_id=?",
+            (clerk_org_id,),
+        )
+
+
 def get_clerk_org(clerk_org_id: str) -> Optional[dict]:
     with _connect() as conn:
         row = conn.execute("SELECT * FROM clerk_orgs WHERE clerk_org_id=?", (clerk_org_id,)).fetchone()

@@ -4,7 +4,7 @@ import { api, Org } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Building2, Plus, MailCheck, Search } from "lucide-react";
+import { Building2, Plus, MailCheck, Search, Trash2 } from "lucide-react";
 
 export default function Organizations() {
   const { toast } = useToast();
@@ -29,6 +29,24 @@ export default function Organizations() {
         (o) => o.name.toLowerCase().includes(q) || o.id.toLowerCase().includes(q),
       )
     : orgs;
+
+  const remove = async (o: Org) => {
+    if (!window.confirm(
+      `Delete "${o.name}"?\n\nThis removes the org from Clerk and here. Any members are detached ` +
+      `(they become org-less users and lose admin/uploader access for this org). Their past ` +
+      `submissions stay in the database. This can't be undone.`,
+    )) return;
+    setBusy(true);
+    try {
+      await api.deleteOrg(o.id);
+      toast({ title: "Organization deleted", description: o.name });
+      await load();
+    } catch (err: any) {
+      toast({ title: "Failed", description: err?.message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const create = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,9 +150,21 @@ export default function Organizations() {
                   <p className="font-semibold">{o.name}</p>
                   <p className="text-xs text-muted-foreground font-mono truncate">{o.id}</p>
                 </div>
-                <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
-                  <MailCheck size={13} /> Clerk-managed
-                </span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs text-muted-foreground inline-flex items-center gap-1">
+                    <MailCheck size={13} /> Clerk-managed
+                  </span>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    disabled={busy}
+                    title="Delete organization"
+                    className="h-8 w-8 border-destructive/40 text-destructive hover:bg-destructive/10"
+                    onClick={() => remove(o)}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </div>
               </div>
             ))
           )}

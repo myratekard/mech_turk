@@ -205,6 +205,15 @@ def list_clerk_orgs() -> List[dict]:
     return list(_clerk_orgs().find({}, {"_id": 0}).sort("created_at", -1))
 
 
+def delete_clerk_org(clerk_org_id: str) -> None:
+    _clerk_orgs().delete_one({"clerk_org_id": clerk_org_id})
+    _org_admin_invites().delete_many({"clerk_org_id": clerk_org_id})
+    _users().update_many(
+        {"clerk_org_id": clerk_org_id},
+        {"$set": {"clerk_org_id": None, "clerk_org_role": None}},
+    )
+
+
 def get_clerk_org(clerk_org_id: str) -> Optional[dict]:
     return _clerk_orgs().find_one({"clerk_org_id": clerk_org_id}, {"_id": 0})
 

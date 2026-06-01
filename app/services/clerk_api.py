@@ -49,6 +49,11 @@ def get_organization(org_id: str) -> dict:
     return _request("GET", f"/organizations/{org_id}")
 
 
+def delete_organization(org_id: str) -> dict:
+    """Delete an organization in Clerk (used to clean up stray/test orgs)."""
+    return _request("DELETE", f"/organizations/{org_id}")
+
+
 def find_user_by_email(email: str) -> Optional[dict]:
     """Return the Clerk user with this email address, or None. Lets org creation add an
     EXISTING user directly as admin (a sign-up invite would fail with 'email taken')."""
