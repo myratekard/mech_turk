@@ -93,11 +93,16 @@ def approve(submission_id: int, user: dict = Depends(_reviewer)):
     if not acct_handle:
         data = storage.read_object(row["object_path"])
         if data is not None:
-            mime, _ = mimetypes.guess_type(row["file_name"] or row["object_path"])
-            result = run_pipeline(data, mime=mime or "image/jpeg", persist=False, force_profile=True)
-            acct_platform = result.platform if result.platform != "unknown" else None
-            acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
-            analysis_json, update_acct = result.model_dump_json(), True
+            try:
+                mime, _ = mimetypes.guess_type(row["file_name"] or row["object_path"])
+                result = run_pipeline(data, mime=mime or "image/jpeg", persist=False, force_profile=True)
+                acct_platform = result.platform if result.platform != "unknown" else None
+                acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
+                analysis_json, update_acct = result.model_dump_json(), True
+            except Exception:
+                # Re-extract is a best-effort fallback. If the LLM is down, don't 500 the
+                # approval — accept the reviewer's verdict with the handle left unknown.
+                pass
 
     # A duplicate of an already-captured account is recorded but earns no points.
     if submissions_db.is_duplicate_capture(acct_platform, acct_handle, exclude_id=submission_id):
@@ -133,7 +138,10 @@ def rerun(submission_id: int, user: dict = Depends(_reviewer)):
     if data is None:
         raise HTTPException(status_code=400, detail="Stored image not found")
     mime, _ = mimetypes.guess_type(row["file_name"] or row["object_path"])
-    result = run_pipeline(data, mime=mime or "image/jpeg", persist=False)
+    try:
+        result = run_pipeline(data, mime=mime or "image/jpeg", persist=False)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Analysis is unavailable right now — please try again.")
     status, points = map_status_points(result)
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))

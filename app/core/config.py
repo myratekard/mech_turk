@@ -13,6 +13,7 @@ class Settings:
     # Gemini (LangChain) — reuse the shared myratekard GOOGLE_API_KEY
     google_api_key: str = os.getenv("GOOGLE_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    llm_max_retries: int = int(os.getenv("LLM_MAX_RETRIES", "2"))   # transient-failure retries
     # Gemini 2.5 "thinking" tokens are billed as output and dominate cost; 0 disables them.
     gemini_thinking_budget: int = int(os.getenv("GEMINI_THINKING_BUDGET", "0"))
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import time
 from functools import lru_cache
 
 from langchain_core.messages import HumanMessage, SystemMessage
@@ -101,4 +102,13 @@ def analyze_screenshot(image_bytes: bytes, mime: str = "image/jpeg") -> VisionAn
             ]
         ),
     ]
-    return _structured_model().invoke(messages)
+    # Retry transient Gemini failures (network/quota/5xx) with short backoff.
+    last_err = None
+    for attempt in range(settings.llm_max_retries + 1):
+        try:
+            return _structured_model().invoke(messages)
+        except Exception as e:
+            last_err = e
+            if attempt < settings.llm_max_retries:
+                time.sleep(0.5 * (2 ** attempt))  # 0.5s, 1s, ...
+    raise last_err
