@@ -42,7 +42,9 @@ export default function Organizations() {
       const org = await api.createOrg(name.trim(), adminEmail.trim());
       toast({
         title: "Organization created",
-        description: org.emailSent
+        description: org.adminStatus === "added"
+          ? `${adminEmail.trim()} already had an account — added as admin. They can sign in now.`
+          : org.adminStatus === "invited"
           ? `Clerk emailed an admin invite to ${adminEmail.trim()}.`
           : "Created.",
       });
