@@ -8,8 +8,11 @@ venv/
 .pytest_cache/
 report*.json
 _label/
-# full-res personal screenshots used for CV iteration (don't commit ~300MB of user data)
+# full-res screenshots used for CV iteration (don't commit large/personal image sets)
 verify/samples/_fullres/
+verify/_goldgrey/
+# Replit dashboard exports + ad-hoc downloads
+*.zip
 
 # frontend monorepo
 # Track the turk dashboard app, but not the other Replit-generated scaffolds
