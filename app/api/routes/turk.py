@@ -142,6 +142,7 @@ def _row_to_submission(row: dict) -> Submission:
         status=row["status"],
         points=row["points"],
         disputed=bool(row.get("disputed") or 0),
+        dupKind=row.get("dup_kind"),
         settled=settled,
         settledAt=row.get("settled_at"),
         settledVia=_org_name(row.get("org_id")) if settled else None,

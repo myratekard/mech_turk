@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Link } from "wouter";
-import { ChevronLeft, ChevronRight, Activity, ExternalLink, Filter, Flag, CheckCircle2, UploadCloud } from "lucide-react";
+import { ChevronLeft, ChevronRight, Activity, ExternalLink, Filter, Flag, CheckCircle2, UploadCloud, AlertTriangle } from "lucide-react";
 import type { ListSubmissionsStatus } from "@workspace/api-client-react";
 
 const DISPUTABLE = ["accepted", "invalid"];
@@ -90,8 +90,8 @@ export default function Submissions() {
       <div className="flex-1 p-6 md:p-8 max-w-7xl mx-auto w-full flex flex-col h-full">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
           <div>
-            <h1 className="text-3xl font-black uppercase tracking-tight">Intel Log</h1>
-            <p className="text-muted-foreground font-medium">History of your operations and earnings.</p>
+            <h1 className="text-3xl font-black uppercase tracking-tight">My Submissions</h1>
+            <p className="text-muted-foreground font-medium">All your uploads and the points you've earned.</p>
           </div>
           
           <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -185,6 +185,11 @@ export default function Submissions() {
                         <Badge variant="outline" className={getStatusColor(displayStatus(sub))}>
                           {getStatusLabel(displayStatus(sub))}
                         </Badge>
+                        {(sub as any).dupKind === "self" && (
+                          <div className="text-[10px] text-amber-500 mt-1 flex items-center gap-1" title="You re-uploaded the same image">
+                            <AlertTriangle size={11} /> Duplicate image
+                          </div>
+                        )}
                         {(sub as any).settled && (
                           <div className="text-[10px] text-green-500 mt-1 flex items-center gap-1" title="Paid out to your organization">
                             <CheckCircle2 size={11} /> Settled{(sub as any).settledVia ? ` via ${(sub as any).settledVia}` : ""}
@@ -227,8 +232,8 @@ export default function Submissions() {
                     <TableCell colSpan={6} className="h-[400px] text-center">
                       <div className="flex flex-col items-center justify-center text-muted-foreground">
                         <Activity size={48} className="mb-4 opacity-20" />
-                        <h3 className="text-lg font-bold mb-1 text-foreground">No Records Found</h3>
-                        <p className="text-sm">We couldn't find any submissions matching these criteria.</p>
+                        <h3 className="text-lg font-bold mb-1 text-foreground">Nothing here yet</h3>
+                        <p className="text-sm">No uploads match this filter.</p>
                       </div>
                     </TableCell>
                   </TableRow>

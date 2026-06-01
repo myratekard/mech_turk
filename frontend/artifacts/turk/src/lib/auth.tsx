@@ -1,5 +1,4 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
-import { useLocation } from "wouter";
 import { useAuth as useClerkAuth, useUser, useClerk, useOrganizationList } from "@clerk/react";
 import { setAuthTokenGetter } from "@workspace/api-client-react";
 import { api, setTokenGetter, User } from "@/lib/api";
@@ -35,7 +34,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [, setLocation] = useLocation();
 
   // Route API bearer tokens through Clerk's session token.
   useEffect(() => {
@@ -77,13 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     api
       .clerkSync(email, ref) // provision local mirror (strictly org-tied)
-      .then((synced) => {
-        // First 3 logins (fresh Clerk session): land on Instructions, then Dashboard after.
-        if (synced?.justLoggedIn && (synced.loginCount ?? 99) <= 3) {
-          setLocation("/instructions");
-        }
-        return api.me(); // authoritative effective role/org from token claims
-      })
+      .then(() => api.me()) // authoritative effective role/org from token claims
       .then((u) => {
         setUser(u);
         localStorage.removeItem("turk_ref");

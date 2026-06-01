@@ -28,6 +28,7 @@ class Submission(BaseModel):
     status: SubmissionStatus
     points: int
     disputed: bool = False
+    dupKind: Optional[str] = None      # 'self' | 'regular' for duplicates
     settled: bool = False
     settledAt: Optional[str] = None
     settledVia: Optional[str] = None   # org name the settlement came through

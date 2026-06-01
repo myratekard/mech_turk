@@ -177,7 +177,7 @@ export default function Upload() {
     <Shell>
       <div className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full">
         <div className="mb-8">
-          <h1 className="text-3xl font-black uppercase tracking-tight">Acquire Intel</h1>
+          <h1 className="text-3xl font-black uppercase tracking-tight">Upload Screenshots</h1>
           <p className="text-muted-foreground font-medium">
             Upload mobile screenshots of <span className="text-foreground font-semibold">verified accounts of
             African-descent creators</span> to process and earn points.
@@ -207,7 +207,7 @@ export default function Upload() {
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary mb-4 shadow-[0_0_15px_rgba(0,255,255,0.2)]">
                 <UploadCloud size={32} />
               </div>
-              <h3 className="text-xl font-bold mb-2">Drag & Drop Intel</h3>
+              <h3 className="text-xl font-bold mb-2">Drag & Drop Screenshots</h3>
               <p className="text-muted-foreground max-w-sm">
                 Drop your screenshots here or click to browse. Supported formats: JPG, PNG, WEBP. Up to {MAX_FILES} at a time.
               </p>
