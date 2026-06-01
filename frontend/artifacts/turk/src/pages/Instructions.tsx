@@ -29,7 +29,7 @@ const steps = [
     bg: "bg-primary/10",
     border: "border-primary/20",
     description:
-      "On Instagram, X (Twitter) or TikTok, find a creator of African descent who has the official verified badge next to their name — blue, or gold/grey on X. That badge is what we're collecting.",
+      "On Instagram, X (Twitter) or TikTok, find a creator of African descent who has the official verified badge next to their name. That badge is what we're collecting.",
   },
   {
     number: "02",
@@ -66,8 +66,8 @@ const rules = [
   },
   {
     icon: Ban,
-    label: "Duplicates lose points",
-    detail: "Each account should be captured once. Submitting an account that's already been captured deducts 5 points, and re-uploading the same image deducts 10 — so only submit fresh, verified accounts.",
+    label: "Avoid duplicates",
+    detail: "Each account should only be captured once. Try to avoid uploading duplicates or re-uploading the same image — they don't earn points and can cost you points.",
   },
   {
     icon: AlertTriangle,
@@ -79,7 +79,7 @@ const rules = [
 const pointTiers = [
   { label: "Approved verified account", range: "+50 pts", color: "text-green-500" },
   { label: "Duplicate (account already captured)", range: "−5 pts", color: "text-red-500" },
-  { label: "Self-duplicate (you re-upload the same image)", range: "−10 pts", color: "text-red-500" },
+  { label: "Re-uploading the same image", range: "warning, then up to −10 pts", color: "text-red-500" },
   { label: "Invalid / unsupported", range: "0 pts", color: "text-muted-foreground" },
 ];
 
@@ -239,8 +239,10 @@ export default function Instructions() {
             </div>
             <div className="p-5 border-t border-border bg-muted/20">
               <p className="text-xs text-muted-foreground leading-relaxed">
-                Points are awarded automatically once a submission is accepted. Your total accumulates on the
-                dashboard and goes toward your position on the leaderboard.
+                Points are awarded automatically once a submission is accepted. Capturing an account that's
+                already in the directory costs a few points, and the penalty for re-uploading your own image
+                grows if you keep doing it — so focus on fresh, verified accounts. Your total accumulates on
+                the dashboard and goes toward your position on the leaderboard.
               </p>
             </div>
           </div>
