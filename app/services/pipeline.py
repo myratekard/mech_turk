@@ -81,6 +81,7 @@ def analyze(
         platform=va.platform,
         platform_confidence=va.platform_confidence,
         is_profile_screenshot=va.is_profile_screenshot,
+        appears_african_descent=va.appears_african_descent,
         verification=verification,
         profile=profile,
         warnings=warnings,

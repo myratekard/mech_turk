@@ -130,6 +130,7 @@ export interface ReviewItem {
   needsReview?: boolean;
   profile?: any;
   reasoning?: string;
+  africanDescent?: boolean | null;
 }
 
 // ---- auth (Clerk-backed; login/signup happen in Clerk UI) ----

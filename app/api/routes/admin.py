@@ -57,6 +57,7 @@ def _row_to_review_item(row: dict) -> ReviewItem:
         verified=ver.get("verified"), confidence=ver.get("confidence"),
         needsReview=ver.get("needs_review"), profile=a.get("profile"),
         reasoning=(ver.get("llm_signal") or {}).get("reasoning"),
+        africanDescent=a.get("appears_african_descent"),
     )
 
 

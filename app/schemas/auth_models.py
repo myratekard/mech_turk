@@ -141,6 +141,7 @@ class ReviewItem(BaseModel):
     needsReview: Optional[bool] = None
     profile: Optional[Any] = None
     reasoning: Optional[str] = None
+    africanDescent: Optional[bool] = None   # informational only
 
 
 class ReviewQueue(BaseModel):
