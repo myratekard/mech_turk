@@ -77,6 +77,25 @@ def _resolve_ref(code: str):
     return inviter["id"], clerk_org_id, org_name, inviter["username"]
 
 
+def _first_clerk_org_membership(clerk_user_id: str):
+    """(org_id, org_role) of the user's first Clerk org membership, or (None, None).
+    Lets an invited member be provisioned even when their session has no active org set."""
+    try:
+        from app.services import clerk_api
+        memberships = clerk_api.get_user_org_memberships(clerk_user_id)
+    except Exception as e:
+        print(f"[clerk] membership lookup failed: {e}")
+        return None, None
+    if not memberships:
+        return None, None
+    m = memberships[0]
+    org = m.get("organization") or {}
+    org_id = org.get("id")
+    if org_id and org.get("name"):
+        auth_db.upsert_clerk_org(org_id, org["name"])  # keep our label mirror fresh
+    return org_id, m.get("role")
+
+
 @router.get("/ref/{code}", response_model=RefInfo)
 def ref_info(code: str):
     resolved = _resolve_ref(code)
@@ -125,11 +144,14 @@ def clerk_sync(body: ClerkSyncInput, authorization: Optional[str] = Header(defau
         else:
             raise HTTPException(status_code=403, detail="Invalid or expired referral link")
     elif not org_id_claim:
-        # No superuser/turk-admin/referral and not arriving via a Clerk org invitation.
-        raise HTTPException(
-            status_code=403,
-            detail="Registration requires a valid organization invite or referral link.",
-        )
+        # No active org in the session token yet — but they may have just accepted a Clerk org
+        # invitation. Look up their Clerk org membership directly so we can still provision them.
+        org_id_claim, org_role_claim = _first_clerk_org_membership(clerk_id)
+        if not org_id_claim:
+            raise HTTPException(
+                status_code=403,
+                detail="Registration requires a valid organization invite or referral link.",
+            )
 
     username = (email.split("@")[0] if email else None) or f"user{clerk_id[-6:]}"
     user = auth_db.create_clerk_user(
