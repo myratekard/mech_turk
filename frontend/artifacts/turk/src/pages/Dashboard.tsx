@@ -128,7 +128,7 @@ export default function Dashboard() {
           <div className="p-6 border-b border-border flex justify-between items-center bg-muted/20">
             <h2 className="text-xl font-bold uppercase tracking-wide flex items-center gap-2">
               <Zap size={20} className="text-primary" />
-              Recent Intel
+              Recent Uploads
             </h2>
           </div>
           
@@ -190,8 +190,8 @@ export default function Dashboard() {
                 <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-4 text-muted-foreground">
                   <Activity size={32} />
                 </div>
-                <h3 className="text-lg font-bold mb-1">No Intel Found</h3>
-                <p className="text-muted-foreground text-sm">Upload your first screenshot to start the grind.</p>
+                <h3 className="text-lg font-bold mb-1">No uploads yet</h3>
+                <p className="text-muted-foreground text-sm">Upload your first screenshot to get started.</p>
               </div>
             )}
           </div>
@@ -249,7 +249,7 @@ function PointsBreakdown({ breakdown, total }: { breakdown?: BreakdownEntry[]; t
       <p className="px-6 pb-4 pt-1 text-xs text-muted-foreground">
         Each accepted screenshot earns points; duplicate uploads are penalized. Pending submissions
         don&apos;t count until a reviewer approves them. Think a decision is wrong? Use{" "}
-        <span className="font-semibold text-foreground">Dispute</span> on the Intel Log.
+        <span className="font-semibold text-foreground">Dispute</span> on My Submissions.
       </p>
     </div>
   );

@@ -36,6 +36,7 @@ export interface Submission {
   status: SubmissionStatus;
   points: number;
   disputed?: boolean;
+  dupKind?: string | null;
   settled?: boolean;
   settledAt?: string | null;
   settledVia?: string | null;
