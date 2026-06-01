@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { Users as UsersIcon, Ban, ShieldCheck, Search } from "lucide-react";
+import { Users as UsersIcon, Ban, ShieldCheck, Search, Copy } from "lucide-react";
 
 // Superuser-only: moderate (block/unblock) any provisioned user across the platform.
 export default function Users() {
@@ -35,14 +35,40 @@ export default function Users() {
     finally { setBusy(false); }
   };
 
+  const reconcile = async () => {
+    if (!window.confirm(
+      "Find accounts that were accepted more than once (same platform + handle), keep the earliest, " +
+      "and re-flag the rest as duplicates with 0 points? Already-settled/invoiced rows are left alone. " +
+      "Safe to run more than once.",
+    )) return;
+    setBusy(true);
+    try {
+      const r = await api.reconcileDuplicates();
+      await load();
+      toast({
+        title: "Reconcile complete",
+        description: `${r.duplicateGroups} duplicated account(s) · ${r.demoted} re-flagged · ${r.skipped} left (already settled/invoiced).`,
+      });
+    } catch (e: any) {
+      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Shell>
       <div className="flex-1 p-6 md:p-8 max-w-4xl mx-auto w-full">
-        <div className="mb-8">
-          <h1 id="tour-users" className="text-3xl font-black uppercase tracking-tight flex items-center gap-2">
-            <UsersIcon className="text-primary" /> Users
-          </h1>
-          <p className="text-muted-foreground font-medium">Moderate any account on the platform.</p>
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div>
+            <h1 id="tour-users" className="text-3xl font-black uppercase tracking-tight flex items-center gap-2">
+              <UsersIcon className="text-primary" /> Users
+            </h1>
+            <p className="text-muted-foreground font-medium">Moderate any account on the platform.</p>
+          </div>
+          <Button variant="outline" size="sm" disabled={busy} onClick={reconcile} className="gap-2 shrink-0">
+            <Copy size={14} /> Reconcile duplicates
+          </Button>
         </div>
 
         <div className="relative mb-4">

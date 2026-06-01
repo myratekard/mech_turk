@@ -200,6 +200,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ objectPath }),
     }),
+  reconcileDuplicates: () =>
+    apiFetch<{ duplicateGroups: number; demoted: number; skipped: number }>(
+      "/api/admin/maintenance/reconcile-duplicates",
+      { method: "POST" },
+    ),
 };
 
 // Build a registration link from any referral/registration code.

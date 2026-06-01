@@ -330,6 +330,21 @@ def analytics_per_user(user: dict = Depends(_analytics_roles)):
     return out
 
 
+# --------------------------------------------------------------- maintenance
+class ReconcileResult(BaseModel):
+    duplicateGroups: int   # accounts (platform+handle) that had >1 accepted capture
+    demoted: int           # accepted captures re-flagged as duplicate (points zeroed)
+    skipped: int           # left alone because already settled / invoiced
+
+
+@router.post("/maintenance/reconcile-duplicates", response_model=ReconcileResult)
+def reconcile_duplicates(user: dict = Depends(require_superuser)):
+    """Superuser one-off: collapse historical accepted captures that share a platform+handle —
+    keep the earliest, re-flag the rest as duplicates (0 pts). Safe to re-run."""
+    res = submissions_db.reconcile_duplicate_captures()
+    return ReconcileResult(**res)
+
+
 # ------------------------------------------------------------------- invoices
 # Org admins generate invoices for their org's outstanding points; the superuser settles
 # them. Settling marks the covered submissions settled (surfaced on the uploader's dashboard).

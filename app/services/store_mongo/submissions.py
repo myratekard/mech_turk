@@ -194,6 +194,34 @@ def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000) -> O
     return best
 
 
+def reconcile_duplicate_captures() -> dict:
+    """One-off cleanup: where several ACCEPTED submissions share the same (platform, handle),
+    keep the earliest and demote the rest to 'duplicate' with 0 points. Settled/invoiced rows
+    are left untouched. Idempotent."""
+    ts = _now()
+    rows = list(_c().find(
+        {"status": "accepted", "acct_platform": {"$ne": None}, "acct_handle": {"$ne": None}},
+        {"_id": 0, "id": 1, "acct_platform": 1, "acct_handle": 1, "settled": 1, "invoice_id": 1},
+    ).sort("id", 1))
+    groups: dict = {}
+    for r in rows:
+        groups.setdefault((r["acct_platform"], r["acct_handle"]), []).append(r)
+    demoted, skipped, dup_groups = [], 0, 0
+    for subs in groups.values():
+        if len(subs) < 2:
+            continue
+        dup_groups += 1
+        for r in subs[1:]:
+            if r.get("settled") or r.get("invoice_id") is not None:
+                skipped += 1
+                continue
+            _c().update_one({"id": r["id"]}, {"$set": {
+                "status": "duplicate", "dup_kind": "regular", "points": 0, "updated_at": ts,
+            }})
+            demoted.append(r["id"])
+    return {"duplicateGroups": dup_groups, "demoted": len(demoted), "skipped": skipped}
+
+
 def reassign_user(old_user_id: str, new_user_id: str) -> int:
     res = _c().update_many({"user_id": old_user_id}, {"$set": {"user_id": new_user_id}})
     return int(res.modified_count)

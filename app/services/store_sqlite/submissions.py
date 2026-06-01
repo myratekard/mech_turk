@@ -271,6 +271,39 @@ def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000) -> O
     return best
 
 
+def reconcile_duplicate_captures() -> dict:
+    """One-off cleanup: where several ACCEPTED submissions share the same (platform, handle),
+    keep the earliest as the legitimate capture and demote the rest to 'duplicate' with 0 points.
+    Already-settled or already-invoiced rows are left untouched (they've been billed/paid).
+    Idempotent — re-running finds nothing because demoted rows are no longer 'accepted'."""
+    ts = _now()
+    with _connect() as conn:
+        rows = conn.execute(
+            "SELECT id, acct_platform, acct_handle, settled, invoice_id FROM submissions "
+            "WHERE status='accepted' AND acct_platform IS NOT NULL AND acct_handle IS NOT NULL "
+            "ORDER BY acct_platform, acct_handle, id"
+        ).fetchall()
+        groups: dict = {}
+        for r in rows:
+            groups.setdefault((r["acct_platform"], r["acct_handle"]), []).append(r)
+        demoted, skipped = [], 0
+        dup_groups = 0
+        for subs in groups.values():
+            if len(subs) < 2:
+                continue
+            dup_groups += 1
+            for r in subs[1:]:  # keep subs[0] (earliest id); demote the rest
+                if r["settled"] or r["invoice_id"] is not None:
+                    skipped += 1
+                    continue
+                conn.execute(
+                    "UPDATE submissions SET status='duplicate', dup_kind='regular', points=0, updated_at=? WHERE id=?",
+                    (ts, r["id"]),
+                )
+                demoted.append(r["id"])
+    return {"duplicateGroups": dup_groups, "demoted": len(demoted), "skipped": skipped}
+
+
 def reassign_user(old_user_id: str, new_user_id: str) -> int:
     """One-off migration: move legacy submissions to a real user id."""
     with _connect() as conn:
