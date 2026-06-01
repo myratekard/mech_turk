@@ -1,4 +1,5 @@
-import { Switch, Route, Router as WouterRouter, Redirect } from "wouter";
+import { Switch, Route, Router as WouterRouter, Redirect, useLocation } from "wouter";
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ClerkProvider } from "@clerk/react";
 import { shadcn } from "@clerk/themes";
@@ -144,6 +145,30 @@ function Router() {
   );
 }
 
+// New users land on the Instructions page on their first login. loginCount is incremented
+// by the backend on each new Clerk session, so loginCount <= 1 means "first sign-in". We only
+// redirect from the default landing spots ("/" or "/dashboard") and only once per browser, so
+// returning users and normal navigation are never hijacked.
+const FIRST_RUN_KEY = "turk_instructions_landed";
+
+function FirstRunRedirect() {
+  const { user, error, loading } = useAuth();
+  const [location, navigate] = useLocation();
+  useEffect(() => {
+    if (loading || error || !user) return;
+    if (localStorage.getItem(FIRST_RUN_KEY)) return;
+    if ((user.loginCount ?? 0) > 1) {
+      localStorage.setItem(FIRST_RUN_KEY, "1"); // returning user — don't bounce, just remember
+      return;
+    }
+    if (location === "/" || location === "/dashboard") {
+      localStorage.setItem(FIRST_RUN_KEY, "1");
+      navigate("/instructions");
+    }
+  }, [user, error, loading, location, navigate]);
+  return null;
+}
+
 // Show the first-time tour only to a signed-in, provisioned user (not on landing/login/denied).
 function TourGate() {
   const { user, error } = useAuth();
@@ -163,6 +188,7 @@ function App() {
           <AuthProvider>
             <TooltipProvider>
               <Router />
+              <FirstRunRedirect />
               <TourGate />
               <Toaster />
             </TooltipProvider>

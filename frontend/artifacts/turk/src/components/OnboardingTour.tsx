@@ -25,7 +25,7 @@ const steps = [
     subtitle: "Step 1",
     title: "Find a verified creator",
     description:
-      "On Instagram, X (Twitter) or TikTok, find a creator of African descent who has the official verified badge next to their name — blue, or gold/grey on X.",
+      "On Instagram, X (Twitter) or TikTok, find a creator of African descent who has the official verified badge next to their name.",
   },
   {
     icon: Smartphone,
