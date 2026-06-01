@@ -105,6 +105,7 @@ def approve(submission_id: int, user: dict = Depends(_reviewer)):
         submissions_db.update_submission_status(
             submission_id, "duplicate", dup_pts, analysis_json=analysis_json,
             acct_platform=acct_platform, acct_handle=acct_handle, update_acct=update_acct,
+            dup_kind="regular",
         )
         return {"ok": True, "id": submission_id, "status": "duplicate", "points": dup_pts}
 
@@ -136,11 +137,12 @@ def rerun(submission_id: int, user: dict = Depends(_reviewer)):
     status, points = map_status_points(result)
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
+    dup_kind = None
     if status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle, exclude_id=submission_id):
-        status, points = "duplicate", regular_duplicate_points(row["user_id"])
+        status, points, dup_kind = "duplicate", regular_duplicate_points(row["user_id"]), "regular"
     submissions_db.update_submission_status(
         submission_id, status, points, analysis_json=result.model_dump_json(),
-        acct_platform=acct_platform, acct_handle=acct_handle, update_acct=True,
+        acct_platform=acct_platform, acct_handle=acct_handle, update_acct=True, dup_kind=dup_kind,
     )
     return {"ok": True, "id": submission_id, "status": status, "points": points,
             "platform": platform_label(result)}

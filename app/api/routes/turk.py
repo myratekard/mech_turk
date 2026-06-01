@@ -63,6 +63,16 @@ def regular_duplicate_points(user_id) -> int:
     return settings.points_duplicate
 
 
+def self_duplicate_points(user_id) -> int:
+    """Escalating self-duplicate penalty: first N = warning (0), next M = mid penalty, then -10."""
+    n = submissions_db.count_user_self_duplicates(str(user_id))
+    if n < settings.self_dup_warn_count:
+        return 0
+    if n < settings.self_dup_warn_count + settings.self_dup_mid_count:
+        return settings.self_dup_mid_penalty
+    return settings.points_self_duplicate
+
+
 # --------------------------------------------------------------------------- health
 @router.get("/healthz", response_model=HealthStatus, tags=["health"])
 def health_check():
@@ -173,13 +183,16 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     if match:
         # Self-duplicate = the same user re-uploading the same image; others' re-upload = duplicate.
         same_user = match["user_id"] == uid
-        points = settings.points_self_duplicate if same_user else regular_duplicate_points(uid)
+        if same_user:
+            dup_kind, points = "self", self_duplicate_points(uid)
+        else:
+            dup_kind, points = "regular", regular_duplicate_points(uid)
         row = submissions_db.insert_submission(
             user_id=uid, org_id=user.get("org_id"), image_url=body.imageUrl,
             object_path=body.objectPath, file_name=body.fileName,
             platform=match["platform"], status="duplicate", points=points,
             analysis_json=match["analysis_json"], acct_platform=match["acct_platform"],
-            acct_handle=match["acct_handle"], image_hash=img_hash,
+            acct_handle=match["acct_handle"], image_hash=img_hash, dup_kind=dup_kind,
         )
         return _row_to_submission(row)
 
@@ -200,8 +213,9 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     # is available if the submission is later disputed and approved.
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
+    dup_kind = None
     if status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle):
-        status, points = "duplicate", regular_duplicate_points(uid)
+        status, points, dup_kind = "duplicate", regular_duplicate_points(uid), "regular"
 
     row = submissions_db.insert_submission(
         user_id=uid,
@@ -216,6 +230,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
         acct_platform=acct_platform,
         acct_handle=acct_handle,
         image_hash=img_hash,
+        dup_kind=dup_kind,
     )
     return _row_to_submission(row)
 
