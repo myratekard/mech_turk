@@ -58,7 +58,9 @@ class PointsBreakdownEntry(BaseModel):
 
 
 class DashboardSummary(BaseModel):
-    totalPoints: int
+    totalPoints: int                 # gross lifetime points (breakdown reconciles to this)
+    settledPoints: int = 0           # points already paid out via a settled invoice
+    unsettledPoints: int = 0         # outstanding = totalPoints - settledPoints
     totalSubmissions: int
     accepted: int
     inReview: int

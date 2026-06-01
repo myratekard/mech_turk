@@ -117,7 +117,9 @@ def is_duplicate_capture(
 
 def analytics(org_id: Optional[int] = None) -> dict:
     q = {} if org_id is None else {"org_id": org_id}
-    rows = list(_c().find(q, {"_id": 0, "status": 1, "points": 1}))
+    rows = list(_c().find(q, {"_id": 0, "status": 1, "points": 1, "settled": 1}))
+    total_points = sum(r.get("points", 0) for r in rows)
+    settled_points = sum(r.get("points", 0) for r in rows if r.get("settled"))
     return {
         "totalSubmissions": len(rows),
         "accepted": sum(1 for r in rows if r["status"] == "accepted"),
@@ -125,7 +127,9 @@ def analytics(org_id: Optional[int] = None) -> dict:
         "inReview": sum(1 for r in rows if r["status"] == "in_review"),
         "duplicate": sum(1 for r in rows if r["status"] == "duplicate"),
         "unsupported": sum(1 for r in rows if r["status"] == "unsupported"),
-        "totalPoints": sum(r.get("points", 0) for r in rows),
+        "totalPoints": total_points,
+        "settledPoints": settled_points,
+        "unsettledPoints": total_points - settled_points,
     }
 
 
@@ -253,8 +257,12 @@ def recent_submissions(user_id: str, n: int = 5) -> List[dict]:
 
 def dashboard_summary(user_id: str) -> dict:
     today = datetime.now(timezone.utc).date().isoformat()
-    rows = list(_c().find({"user_id": user_id}, {"_id": 0, "status": 1, "points": 1, "updated_at": 1}))
+    rows = list(_c().find({"user_id": user_id}, {"_id": 0, "status": 1, "points": 1, "updated_at": 1, "settled": 1}))
     total_points = sum(r.get("points", 0) for r in rows)
+    settled_rows = [r for r in rows if r.get("settled")]
+    settled_points = sum(r.get("points", 0) for r in settled_rows)
+    settled_count = len(settled_rows)
+    unsettled_points = total_points - settled_points
     accepted = sum(1 for r in rows if r["status"] == "accepted")
     in_review = sum(1 for r in rows if r["status"] == "in_review")
     processed = sum(1 for r in rows if r["status"] == "processed")
@@ -271,10 +279,13 @@ def dashboard_summary(user_id: str) -> dict:
         {"key": "in_review", "label": "Pending review", "count": in_review, "points": 0},
         {"key": "invalid", "label": "Rejected / invalid", "count": invalid, "points": 0},
         {"key": "unsupported", "label": "Unsupported", "count": unsupported, "points": 0},
+        {"key": "settled", "label": "Settled (paid out)", "count": settled_count, "points": -settled_points},
     ]
 
     return {
         "totalPoints": total_points,
+        "settledPoints": settled_points,
+        "unsettledPoints": unsettled_points,
         "totalSubmissions": len(rows),
         "accepted": accepted,
         "inReview": in_review,
