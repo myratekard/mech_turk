@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/layout/Shell";
 import { api, Analytics as AnalyticsData, UserStat } from "@/lib/api";
-import { BarChart3, Users as UsersIcon, Ban, CheckCircle2, XCircle, Clock, Zap, FileStack, Copy, ImageOff, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
+import { BarChart3, Users as UsersIcon, Ban, CheckCircle2, XCircle, Clock, Zap, FileStack, Copy, ImageOff, ArrowUp, ArrowDown, ArrowUpDown, Wallet } from "lucide-react";
 
 function Stat({ title, value, icon: Icon, color }: { title: string; value?: number; icon: any; color: string }) {
   return (
@@ -113,7 +113,8 @@ export default function Analytics() {
         ) : (
           <>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
-              <Stat title="Total Points" value={data.totalPoints} icon={Zap} color="text-primary" />
+              <Stat title="Total Points" value={data.unsettledPoints ?? data.totalPoints} icon={Zap} color="text-primary" />
+              <Stat title="Settled" value={data.settledPoints} icon={Wallet} color="text-emerald-500" />
               <Stat title="Submissions" value={data.totalSubmissions} icon={FileStack} color="text-blue-500" />
               <Stat title="Accepted" value={data.accepted} icon={CheckCircle2} color="text-green-500" />
               <Stat title="Invalid" value={data.invalid} icon={XCircle} color="text-red-500" />

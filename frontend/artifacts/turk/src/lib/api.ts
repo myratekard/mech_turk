@@ -57,6 +57,8 @@ export interface Analytics {
   duplicate?: number;
   unsupported?: number;
   totalPoints: number;
+  settledPoints?: number;
+  unsettledPoints?: number;
 }
 
 export interface UserStat {

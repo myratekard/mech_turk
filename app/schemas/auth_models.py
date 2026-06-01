@@ -48,6 +48,8 @@ class OrgAnalytics(BaseModel):
     duplicate: int = 0
     unsupported: int = 0
     totalPoints: int
+    settledPoints: int = 0
+    unsettledPoints: int = 0
 
 
 class UserStat(BaseModel):

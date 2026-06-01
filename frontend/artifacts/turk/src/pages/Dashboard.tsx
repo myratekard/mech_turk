@@ -7,7 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { Zap, CheckCircle2, Clock, Activity, BarChart3, XCircle, Copy, ImageOff, UploadCloud } from "lucide-react";
+import { Zap, CheckCircle2, Clock, Activity, BarChart3, XCircle, Copy, ImageOff, UploadCloud, Wallet } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,15 +64,22 @@ export default function Dashboard() {
 
         {/* Stats Grid */}
         <div id="tour-stats-grid" className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-10">
-          <StatCard 
-            title="Total Points" 
-            value={summary?.totalPoints} 
-            icon={Zap} 
-            color="text-primary" 
-            loading={isSummaryLoading} 
+          <StatCard
+            title="Total Points"
+            value={(summary as any)?.unsettledPoints ?? summary?.totalPoints}
+            icon={Zap}
+            color="text-primary"
+            loading={isSummaryLoading}
           />
-          <StatCard 
-            title="Accepted" 
+          <StatCard
+            title="Settled"
+            value={(summary as any)?.settledPoints}
+            icon={Wallet}
+            color="text-emerald-500"
+            loading={isSummaryLoading}
+          />
+          <StatCard
+            title="Accepted"
             value={summary?.accepted} 
             icon={CheckCircle2} 
             color="text-green-500" 
@@ -119,7 +126,7 @@ export default function Dashboard() {
         {summary && (
           <PointsBreakdown
             breakdown={(summary as any).pointsBreakdown}
-            total={summary.totalPoints}
+            total={(summary as any).unsettledPoints ?? summary.totalPoints}
           />
         )}
 
@@ -240,7 +247,7 @@ function PointsBreakdown({ breakdown, total }: { breakdown?: BreakdownEntry[]; t
       </div>
 
       <div className="px-6 py-4 flex items-center justify-between bg-muted/20 border-t border-border">
-        <span className="text-sm font-bold uppercase tracking-wide">Total Points</span>
+        <span className="text-sm font-bold uppercase tracking-wide">Outstanding Points</span>
         <span className="text-2xl font-black font-mono text-primary tracking-tight">
           {(total ?? 0).toLocaleString()}
         </span>
@@ -248,7 +255,8 @@ function PointsBreakdown({ breakdown, total }: { breakdown?: BreakdownEntry[]; t
 
       <p className="px-6 pb-4 pt-1 text-xs text-muted-foreground">
         Each accepted screenshot earns points; duplicate uploads are penalized. Pending submissions
-        don&apos;t count until a reviewer approves them. Think a decision is wrong? Use{" "}
+        don&apos;t count until a reviewer approves them. Settled points have already been paid out
+        (deducted above), leaving your outstanding total. Think a decision is wrong? Use{" "}
         <span className="font-semibold text-foreground">Dispute</span> on My Submissions.
       </p>
     </div>
