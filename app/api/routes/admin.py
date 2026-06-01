@@ -199,6 +199,19 @@ def list_orgs(user: dict = Depends(require_superuser)):
     return [_to_org_out(o["clerk_org_id"], o["name"], o.get("created_at")) for o in auth_db.list_clerk_orgs()]
 
 
+@router.delete("/orgs/{org_id}")
+def delete_org(org_id: str, user: dict = Depends(require_superuser)):
+    """Delete an org (cleanup). Removes it from Clerk and our mirror, clears the pending-admin
+    assignment, and detaches any members (they revert to org-less users)."""
+    try:
+        clerk_api.delete_organization(org_id)
+    except Exception as e:
+        # Already gone in Clerk (or transient) — still clean our local footprint.
+        print(f"[clerk] delete org {org_id} failed (cleaning mirror anyway): {e}")
+    auth_db.delete_clerk_org(org_id)
+    return {"ok": True, "id": org_id}
+
+
 # ------------------------------------------------------------------ turk admins
 # Platform-level reviewers/admins (not tied to an org). Superuser invites by email
 # via a Clerk application invitation; the email match flags them turk_admin at sync.

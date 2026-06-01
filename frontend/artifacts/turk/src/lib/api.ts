@@ -166,6 +166,7 @@ export const api = {
   reject: (id: number) => apiFetch(`/api/admin/submissions/${id}/reject`, { method: "POST" }),
   rerun: (id: number) => apiFetch(`/api/admin/submissions/${id}/rerun`, { method: "POST" }),
   listOrgs: () => apiFetch<Org[]>("/api/admin/orgs"),
+  deleteOrg: (id: string) => apiFetch<{ ok: boolean }>(`/api/admin/orgs/${id}`, { method: "DELETE" }),
   createOrg: (name: string, adminEmail?: string) =>
     apiFetch<Org>("/api/admin/orgs", { method: "POST", body: JSON.stringify({ name, adminEmail }) }),
   listUsers: () => apiFetch<User[]>("/api/admin/users"),
