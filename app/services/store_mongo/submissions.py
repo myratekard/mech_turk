@@ -79,6 +79,10 @@ def insert_submission(
 
 
 # --------------------------------------------------------------- review queue
+def count_review_queue() -> int:
+    return int(_c().count_documents({"status": "in_review"}))
+
+
 def list_review_queue(page: int, limit: int) -> Tuple[List[dict], int]:
     c = _c()
     total = c.count_documents({"status": "in_review"})
@@ -146,6 +150,13 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
             "points": r["points"] or 0,
         })
     return out
+
+
+def count_user_regular_duplicates(user_id: str) -> int:
+    """A user's REGULAR duplicates (not self-duplicates) — drives the eased penalty."""
+    return int(_c().count_documents(
+        {"user_id": user_id, "status": "duplicate", "points": {"$ne": settings.points_self_duplicate}}
+    ))
 
 
 def count_user_uploads_since(user_id: str, since_iso: str) -> int:

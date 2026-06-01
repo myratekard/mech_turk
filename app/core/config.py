@@ -60,6 +60,9 @@ class Settings:
     points_accepted: int = int(os.getenv("POINTS_ACCEPTED", "50"))            # new verified capture
     points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "-5"))          # account already captured / others' re-upload (penalty)
     points_self_duplicate: int = int(os.getenv("POINTS_SELF_DUPLICATE", "-10"))  # same user re-uploads the same image (penalty)
+    # After a user racks up this many regular duplicates, the penalty eases off.
+    points_duplicate_reduced: int = int(os.getenv("POINTS_DUPLICATE_REDUCED", "-2"))
+    duplicate_reduce_threshold: int = int(os.getenv("DUPLICATE_REDUCE_THRESHOLD", "20"))
 
     # --- Abuse / cost controls ---
     daily_upload_limit: int = int(os.getenv("DAILY_UPLOAD_LIMIT", "200"))  # per user / 24h

@@ -118,6 +118,11 @@ def insert_submission(
 
 
 # --------------------------------------------------------------- review queue
+def count_review_queue() -> int:
+    with _connect() as conn:
+        return int(conn.execute("SELECT COUNT(*) c FROM submissions WHERE status='in_review'").fetchone()["c"])
+
+
 def list_review_queue(page: int, limit: int) -> Tuple[List[dict], int]:
     """Global pool of in_review submissions across all users/orgs."""
     offset = (page - 1) * limit
@@ -202,6 +207,15 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
         }
         for r in rows
     ]
+
+
+def count_user_regular_duplicates(user_id: str) -> int:
+    """A user's REGULAR duplicates (not self-duplicates) — drives the eased penalty."""
+    with _connect() as conn:
+        return int(conn.execute(
+            "SELECT COUNT(*) c FROM submissions WHERE user_id=? AND status='duplicate' AND points!=?",
+            (user_id, settings.points_self_duplicate),
+        ).fetchone()["c"])
 
 
 def count_user_uploads_since(user_id: str, since_iso: str) -> int:

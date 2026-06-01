@@ -55,6 +55,14 @@ def platform_label(result) -> str:
     return _PLATFORM_LABEL.get(result.platform, "Unknown")
 
 
+def regular_duplicate_points(user_id) -> int:
+    """Regular-duplicate penalty, eased (to points_duplicate_reduced) once the user passes
+    duplicate_reduce_threshold regular duplicates."""
+    if submissions_db.count_user_regular_duplicates(str(user_id)) >= settings.duplicate_reduce_threshold:
+        return settings.points_duplicate_reduced
+    return settings.points_duplicate
+
+
 # --------------------------------------------------------------------------- health
 @router.get("/healthz", response_model=HealthStatus, tags=["health"])
 def health_check():
@@ -165,7 +173,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     if match:
         # Self-duplicate = the same user re-uploading the same image; others' re-upload = duplicate.
         same_user = match["user_id"] == uid
-        points = settings.points_self_duplicate if same_user else settings.points_duplicate
+        points = settings.points_self_duplicate if same_user else regular_duplicate_points(uid)
         row = submissions_db.insert_submission(
             user_id=uid, org_id=user.get("org_id"), image_url=body.imageUrl,
             object_path=body.objectPath, file_name=body.fileName,
@@ -193,7 +201,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
     if status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle):
-        status, points = "duplicate", settings.points_duplicate
+        status, points = "duplicate", regular_duplicate_points(uid)
 
     row = submissions_db.insert_submission(
         user_id=uid,
