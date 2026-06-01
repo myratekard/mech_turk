@@ -81,7 +81,7 @@ export default function ReviewQueue() {
       <div className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-2">
+            <h1 id="tour-review-queue" className="text-3xl font-black uppercase tracking-tight flex items-center gap-2">
               <ShieldCheck className="text-primary" /> Review Queue
             </h1>
             <p className="text-muted-foreground font-medium">Borderline submissions awaiting a human decision.</p>

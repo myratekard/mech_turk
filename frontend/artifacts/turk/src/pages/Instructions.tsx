@@ -87,7 +87,7 @@ export default function Instructions() {
   return (
     <Shell>
       <div className="flex-1 p-6 md:p-8 max-w-4xl mx-auto w-full">
-        <div className="mb-10">
+        <div id="tour-how-it-works" className="mb-10">
           <h1 className="text-3xl font-black uppercase tracking-tight mb-2">What To Do</h1>
           <p className="text-muted-foreground font-medium leading-relaxed">
             TURK is building a directory of <span className="text-foreground font-semibold">verified social
