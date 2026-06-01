@@ -40,22 +40,9 @@ export default function Upload() {
     }
   });
 
-  const { uploadFile } = useUpload({
-    onSuccess: async (response) => {
-      try {
-        await createSubmission.mutateAsync({
-          data: {
-            imageUrl: `/api/storage/objects/${response.objectPath.replace(/^\/objects\//, "")}`,
-            objectPath: response.objectPath,
-            fileName: response.metadata.name,
-            // We could extract platform from filename or let user select, but leaving empty for now
-          }
-        });
-      } catch (err) {
-        throw new Error("Failed to create submission record");
-      }
-    }
-  });
+  // Upload to storage only; the submission record is created in the loop so we can read
+  // the result (and surface duplicates).
+  const { uploadFile } = useUpload();
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -141,8 +128,11 @@ export default function Upload() {
 
   const startUploads = async () => {
     const pendingFiles = files.filter(f => f.status === "pending" || f.status === "error");
-    
+
     if (pendingFiles.length === 0) return;
+
+    let existsCount = 0;   // regular duplicate — account already captured
+    let imageCount = 0;    // self duplicate — same image re-uploaded
 
     for (const fileState of pendingFiles) {
       // Update status to uploading
@@ -160,13 +150,27 @@ export default function Upload() {
         }, 300);
 
         const result = await uploadFile(fileState.file);
-        
-        clearInterval(progressInterval);
 
         if (!result) {
+          clearInterval(progressInterval);
           throw new Error("Upload failed");
         }
-        
+
+        // Create the submission record and read the verdict so we can flag duplicates.
+        const created: any = await createSubmission.mutateAsync({
+          data: {
+            imageUrl: `/api/storage/objects/${result.objectPath.replace(/^\/objects\//, "")}`,
+            objectPath: result.objectPath,
+            fileName: result.metadata.name,
+          },
+        });
+        clearInterval(progressInterval);
+
+        if (created?.status === "duplicate") {
+          if (created?.dupKind === "self") imageCount++;
+          else existsCount++;
+        }
+
         // Update to success, then clear the bar from the queue shortly after so
         // only pending/failed items remain visible.
         setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "success", progress: 100 } : f));
@@ -177,10 +181,22 @@ export default function Upload() {
       }
     }
     
-    toast({
-      title: "Operation Complete",
-      description: "Finished processing uploads.",
-    });
+    // One toast covering both duplicate kinds (account already exists / same image re-uploaded).
+    if (existsCount || imageCount) {
+      const parts: string[] = [];
+      if (existsCount) parts.push(`${existsCount} already exist${existsCount > 1 ? "" : "s"} (account already captured)`);
+      if (imageCount) parts.push(`${imageCount} duplicate image${imageCount > 1 ? "s" : ""} (already uploaded)`);
+      toast({
+        title: "Some uploads were duplicates",
+        description: `${parts.join(" · ")} — duplicates don't earn points.`,
+        variant: "destructive",
+      });
+    } else {
+      toast({
+        title: "Operation Complete",
+        description: "Finished processing uploads.",
+      });
+    }
   };
 
   const pendingCount = files.filter(f => f.status === "pending" || f.status === "error").length;
