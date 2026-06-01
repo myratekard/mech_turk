@@ -131,6 +131,10 @@ export default function ReviewQueue() {
                     <span>{it.confidence != null ? `${Math.round(it.confidence * 100)}%` : "—"}</span>
                     <span className="text-muted-foreground">Handle</span>
                     <span className="truncate">{it.profile?.handle || "—"}</span>
+                    <span className="text-muted-foreground">African descent</span>
+                    <span title="Informational only — does not affect acceptance">
+                      {it.africanDescent == null ? "Unclear" : it.africanDescent ? "Likely" : "Unlikely"}
+                    </span>
                   </div>
                   {it.reasoning && (
                     <p className="text-xs text-muted-foreground italic mb-3 line-clamp-2">“{it.reasoning}”</p>

@@ -115,6 +115,17 @@ class VisionAnalysis(BaseModel):
         None, description="Short justification for the verification verdict"
     )
 
+    # INFORMATIONAL ONLY — never used to accept/reject. Best-effort read of whether the
+    # account holder appears to be of African descent (the platform's focus audience).
+    appears_african_descent: Optional[bool] = Field(
+        default=None,
+        description=(
+            "Best-effort, informational guess: does the profile owner appear to be of African "
+            "descent (from the profile photo, name, bio, content)? null if unclear. This does "
+            "NOT affect verification or acceptance."
+        ),
+    )
+
     profile: VisionProfile = Field(default_factory=VisionProfile)
 
 
@@ -151,6 +162,7 @@ class AnalysisResult(BaseModel):
     platform: Platform
     platform_confidence: float
     is_profile_screenshot: bool = True
+    appears_african_descent: Optional[bool] = None   # informational only
     verification: VerificationResult
     profile: Optional[ProfileArtifact] = None  # populated only when verified
     source_image_ref: Optional[str] = None

@@ -178,7 +178,10 @@ export default function Upload() {
       <div className="flex-1 p-6 md:p-8 max-w-5xl mx-auto w-full">
         <div className="mb-8">
           <h1 className="text-3xl font-black uppercase tracking-tight">Acquire Intel</h1>
-          <p className="text-muted-foreground font-medium">Upload screenshots to process and earn points.</p>
+          <p className="text-muted-foreground font-medium">
+            Upload mobile screenshots of <span className="text-foreground font-semibold">verified accounts of
+            African-descent creators</span> to process and earn points.
+          </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

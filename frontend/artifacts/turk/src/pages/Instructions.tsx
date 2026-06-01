@@ -109,7 +109,9 @@ export default function Instructions() {
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Upload <span className="text-foreground font-semibold">screenshots taken on your mobile phone</span> of
                 the full profile page — the display name, @handle and the official verified badge must all be visible and
-                uncropped. Desktop or web captures, photos of a screen, and edited or cropped images are not accepted.
+                uncropped. We're building a directory of <span className="text-foreground font-semibold">verified
+                accounts of African-descent creators</span>, so please submit those. Desktop or web captures, photos of a
+                screen, and edited or cropped images are not accepted.
               </p>
             </div>
           </div>
