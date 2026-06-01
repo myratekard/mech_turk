@@ -1,6 +1,6 @@
 import { ReactNode, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { Activity, UploadCloud, LayoutDashboard, BookOpen, ShieldCheck, Building2, Users as UsersIcon, GitBranch, LogOut, BarChart3, Menu } from "lucide-react";
+import { Activity, UploadCloud, LayoutDashboard, BookOpen, ShieldCheck, Building2, Users as UsersIcon, GitBranch, LogOut, BarChart3, Menu, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
@@ -28,6 +28,7 @@ export function Shell({ children }: ShellProps) {
     ...(isOrgAdmin ? [{ href: "/referrals", icon: GitBranch, label: "Referrals" }] : []),
     ...(canReview ? [{ href: "/admin/review", icon: ShieldCheck, label: "Review" }] : []),
     ...(isAdmin ? [{ href: "/admin/analytics", icon: BarChart3, label: "Analytics" }] : []),
+    ...((isOrgAdmin || isSuperuser) ? [{ href: "/admin/invoices", icon: Receipt, label: "Invoices" }] : []),
     ...(isOrgAdmin ? [{ href: "/admin/staff", icon: UsersIcon, label: "Staff" }] : []),
     ...(isSuperuser ? [{ href: "/admin/orgs", icon: Building2, label: "Organizations" }] : []),
     ...(isSuperuser ? [{ href: "/admin/turk-admins", icon: ShieldCheck, label: "Turk Admins" }] : []),

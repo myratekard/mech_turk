@@ -28,6 +28,9 @@ class Submission(BaseModel):
     status: SubmissionStatus
     points: int
     disputed: bool = False
+    settled: bool = False
+    settledAt: Optional[str] = None
+    settledVia: Optional[str] = None   # org name the settlement came through
     createdAt: str
     updatedAt: str
 

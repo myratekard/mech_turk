@@ -81,6 +81,42 @@ export interface RefInfo {
   orgName?: string;
   inviter?: string;
 }
+export interface Invoice {
+  id: number;
+  orgId: string;
+  orgName?: string | null;
+  status: "pending" | "settled";
+  submissionCount: number;
+  totalPoints: number;
+  rate: number;
+  amount: number;
+  currency: string;
+  createdBy?: string | null;
+  createdAt: string;
+  settledBy?: string | null;
+  settledAt?: string | null;
+}
+export interface InvoiceLineItem {
+  id: number;
+  userId: string;
+  username?: string | null;
+  platform?: string | null;
+  handle?: string | null;
+  status: string;
+  points: number;
+  createdAt: string;
+}
+export interface InvoiceDetail extends Invoice {
+  items: InvoiceLineItem[];
+}
+export interface OutstandingSummary {
+  orgId: string;
+  count: number;
+  points: number;
+  rate: number;
+  amount: number;
+  currency: string;
+}
 export interface ReviewItem {
   id: number;
   userId: string;
@@ -136,6 +172,13 @@ export const api = {
   // submissions (owner) — contest a decided submission back into review (once only)
   disputeSubmission: (id: number) =>
     apiFetch(`/api/submissions/${id}/dispute`, { method: "POST" }),
+
+  // invoices — org admin generates from outstanding points; superuser settles
+  invoiceOutstanding: () => apiFetch<OutstandingSummary>("/api/admin/invoices/outstanding"),
+  generateInvoice: () => apiFetch<Invoice>("/api/admin/invoices", { method: "POST" }),
+  listInvoices: () => apiFetch<Invoice[]>("/api/admin/invoices"),
+  getInvoice: (id: number) => apiFetch<InvoiceDetail>(`/api/admin/invoices/${id}`),
+  settleInvoice: (id: number) => apiFetch<Invoice>(`/api/admin/invoices/${id}/settle`, { method: "POST" }),
 };
 
 // Build a registration link from any referral/registration code.

@@ -78,6 +78,47 @@ class CreateOrgInput(BaseModel):
     adminEmail: Optional[str] = None
 
 
+# ------------------------------------------------------------------- invoices
+class InvoiceOut(BaseModel):
+    id: int
+    orgId: str
+    orgName: Optional[str] = None
+    status: str                  # pending | settled
+    submissionCount: int
+    totalPoints: int
+    rate: float
+    amount: float
+    currency: str
+    createdBy: Optional[str] = None
+    createdAt: str
+    settledBy: Optional[str] = None
+    settledAt: Optional[str] = None
+
+
+class InvoiceLineItem(BaseModel):
+    id: int
+    userId: str
+    username: Optional[str] = None
+    platform: Optional[str] = None
+    handle: Optional[str] = None
+    status: str
+    points: int
+    createdAt: str
+
+
+class InvoiceDetail(InvoiceOut):
+    items: List[InvoiceLineItem] = []
+
+
+class OutstandingSummary(BaseModel):
+    orgId: str
+    count: int
+    points: int
+    rate: float
+    amount: float
+    currency: str
+
+
 class RefInfo(BaseModel):
     """What the register page shows for a referral/registration code."""
     valid: bool

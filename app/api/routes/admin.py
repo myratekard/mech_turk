@@ -17,8 +17,12 @@ from app.api.routes.turk import map_status_points, platform_label
 from app.core.config import settings
 from app.schemas.auth_models import (
     CreateOrgInput,
+    InvoiceDetail,
+    InvoiceLineItem,
+    InvoiceOut,
     OrgAnalytics,
     OrgOut,
+    OutstandingSummary,
     ReviewItem,
     ReviewQueue,
     UserOut,
@@ -303,3 +307,87 @@ def analytics_per_user(user: dict = Depends(_analytics_roles)):
         ))
     out.sort(key=lambda x: x.total, reverse=True)
     return out
+
+
+# ------------------------------------------------------------------- invoices
+# Org admins generate invoices for their org's outstanding points; the superuser settles
+# them. Settling marks the covered submissions settled (surfaced on the uploader's dashboard).
+_invoice_roles = require_roles("admin", "superuser")
+
+
+def _inv_username(uid) -> str | None:
+    try:
+        u = auth_db.get_user_by_id(int(uid))
+        return u["username"] if u else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_invoice_out(inv: dict) -> InvoiceOut:
+    pts = int(inv.get("total_points") or 0)
+    rate = settings.invoice_point_rate
+    org = auth_db.get_clerk_org(inv["org_id"])
+    return InvoiceOut(
+        id=inv["id"], orgId=inv["org_id"], orgName=org["name"] if org else None,
+        status=inv["status"], submissionCount=int(inv.get("submission_count") or 0),
+        totalPoints=pts, rate=rate, amount=round(pts * rate, 2), currency=settings.invoice_currency,
+        createdBy=_inv_username(inv.get("created_by")), createdAt=inv["created_at"],
+        settledBy=_inv_username(inv.get("settled_by")), settledAt=inv.get("settled_at"),
+    )
+
+
+@router.get("/invoices/outstanding", response_model=OutstandingSummary)
+def invoice_outstanding(user: dict = Depends(require_roles("admin"))):
+    org_id = user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=400, detail="You must be in an organization")
+    s = submissions_db.outstanding_summary(org_id)
+    rate = settings.invoice_point_rate
+    return OutstandingSummary(orgId=org_id, count=s["count"], points=s["points"],
+                              rate=rate, amount=round(s["points"] * rate, 2),
+                              currency=settings.invoice_currency)
+
+
+@router.post("/invoices", response_model=InvoiceOut)
+def create_invoice(user: dict = Depends(require_roles("admin"))):
+    org_id = user.get("org_id")
+    if not org_id:
+        raise HTTPException(status_code=400, detail="You must be in an organization")
+    inv = submissions_db.create_invoice(org_id, user["id"])
+    if not inv:
+        raise HTTPException(status_code=400, detail="No outstanding submissions to invoice")
+    return _to_invoice_out(inv)
+
+
+@router.get("/invoices", response_model=list[InvoiceOut])
+def list_invoices(user: dict = Depends(_invoice_roles)):
+    org_id = None if user["role"] == "superuser" else user.get("org_id")
+    return [_to_invoice_out(i) for i in submissions_db.list_invoices(org_id)]
+
+
+@router.get("/invoices/{invoice_id}", response_model=InvoiceDetail)
+def get_invoice(invoice_id: int, user: dict = Depends(_invoice_roles)):
+    inv = submissions_db.get_invoice(invoice_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if user["role"] != "superuser" and inv["org_id"] != user.get("org_id"):
+        raise HTTPException(status_code=403, detail="Not your organization's invoice")
+    items = [
+        InvoiceLineItem(
+            id=it["id"], userId=str(it["user_id"]), username=_inv_username(it["user_id"]),
+            platform=it.get("platform"), handle=it.get("acct_handle"), status=it["status"],
+            points=it["points"], createdAt=it["created_at"],
+        )
+        for it in inv.get("items", [])
+    ]
+    return InvoiceDetail(**_to_invoice_out(inv).model_dump(), items=items)
+
+
+@router.post("/invoices/{invoice_id}/settle", response_model=InvoiceOut)
+def settle_invoice(invoice_id: int, user: dict = Depends(require_superuser)):
+    inv, err = submissions_db.settle_invoice(invoice_id, user["id"])
+    if err == "not_found":
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if err == "already_settled":
+        raise HTTPException(status_code=409, detail="Invoice already settled")
+    return _to_invoice_out(inv)

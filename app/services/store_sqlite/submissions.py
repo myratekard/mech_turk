@@ -61,6 +61,27 @@ def init_db() -> None:
             conn.execute("ALTER TABLE submissions ADD COLUMN image_hash TEXT")
         if "disputed" not in cols:
             conn.execute("ALTER TABLE submissions ADD COLUMN disputed INTEGER NOT NULL DEFAULT 0")
+        if "invoice_id" not in cols:
+            conn.execute("ALTER TABLE submissions ADD COLUMN invoice_id INTEGER")
+        if "settled" not in cols:
+            conn.execute("ALTER TABLE submissions ADD COLUMN settled INTEGER NOT NULL DEFAULT 0")
+        if "settled_at" not in cols:
+            conn.execute("ALTER TABLE submissions ADD COLUMN settled_at TEXT")
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS invoices (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                org_id      TEXT NOT NULL,
+                status      TEXT NOT NULL DEFAULT 'pending',
+                total_points INTEGER NOT NULL DEFAULT 0,
+                submission_count INTEGER NOT NULL DEFAULT 0,
+                created_by  TEXT,
+                created_at  TEXT NOT NULL,
+                settled_by  TEXT,
+                settled_at  TEXT
+            )
+            """
+        )
 
 
 def insert_submission(
@@ -357,3 +378,86 @@ def dashboard_summary(user_id: str) -> dict:
         "updatedToday": updated_today,
         "pointsBreakdown": points_breakdown,
     }
+
+
+# ------------------------------------------------------------------- invoices
+# Point-bearing, final-state submissions are billable; in_review/invalid/unsupported aren't.
+INVOICEABLE_STATUSES = ("accepted", "duplicate")
+_INV_SQL = "status IN ('accepted','duplicate')"
+
+
+def outstanding_summary(org_id: str) -> dict:
+    """Uninvoiced billable submissions for an org: count + net points."""
+    with _connect() as conn:
+        r = conn.execute(
+            f"SELECT COUNT(*) c, COALESCE(SUM(points),0) p FROM submissions "
+            f"WHERE org_id=? AND invoice_id IS NULL AND {_INV_SQL}",
+            (org_id,),
+        ).fetchone()
+    return {"count": int(r["c"]), "points": int(r["p"])}
+
+
+def create_invoice(org_id: str, created_by) -> Optional[dict]:
+    """Bundle all uninvoiced billable submissions for org into a pending invoice."""
+    ts = _now()
+    with _connect() as conn:
+        rows = conn.execute(
+            f"SELECT id, points FROM submissions WHERE org_id=? AND invoice_id IS NULL AND {_INV_SQL}",
+            (org_id,),
+        ).fetchall()
+        ids = [r["id"] for r in rows]
+        if not ids:
+            return None
+        total = sum(r["points"] for r in rows)
+        cur = conn.execute(
+            "INSERT INTO invoices (org_id,status,total_points,submission_count,created_by,created_at) VALUES (?,?,?,?,?,?)",
+            (org_id, "pending", total, len(ids), str(created_by), ts),
+        )
+        inv_id = cur.lastrowid
+        conn.execute(
+            f"UPDATE submissions SET invoice_id=? WHERE id IN ({','.join('?' * len(ids))})",
+            (inv_id, *ids),
+        )
+        inv = conn.execute("SELECT * FROM invoices WHERE id=?", (inv_id,)).fetchone()
+    return dict(inv)
+
+
+def list_invoices(org_id: Optional[str] = None) -> List[dict]:
+    with _connect() as conn:
+        if org_id is None:
+            rows = conn.execute("SELECT * FROM invoices ORDER BY id DESC").fetchall()
+        else:
+            rows = conn.execute("SELECT * FROM invoices WHERE org_id=? ORDER BY id DESC", (org_id,)).fetchall()
+    return [dict(r) for r in rows]
+
+
+def get_invoice(invoice_id: int) -> Optional[dict]:
+    with _connect() as conn:
+        inv = conn.execute("SELECT * FROM invoices WHERE id=?", (invoice_id,)).fetchone()
+        if not inv:
+            return None
+        items = conn.execute(
+            "SELECT id,user_id,platform,acct_handle,status,points,created_at "
+            "FROM submissions WHERE invoice_id=? ORDER BY id",
+            (invoice_id,),
+        ).fetchall()
+    d = dict(inv)
+    d["items"] = [dict(i) for i in items]
+    return d
+
+
+def settle_invoice(invoice_id: int, settled_by) -> Tuple[Optional[dict], Optional[str]]:
+    ts = _now()
+    with _connect() as conn:
+        inv = conn.execute("SELECT * FROM invoices WHERE id=?", (invoice_id,)).fetchone()
+        if not inv:
+            return None, "not_found"
+        if inv["status"] == "settled":
+            return None, "already_settled"
+        conn.execute(
+            "UPDATE invoices SET status='settled', settled_by=?, settled_at=? WHERE id=?",
+            (str(settled_by), ts, invoice_id),
+        )
+        conn.execute("UPDATE submissions SET settled=1, settled_at=? WHERE invoice_id=?", (ts, invoice_id))
+        updated = conn.execute("SELECT * FROM invoices WHERE id=?", (invoice_id,)).fetchone()
+    return dict(updated), None

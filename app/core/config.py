@@ -53,6 +53,10 @@ class Settings:
     auth_token_ttl_hours: int = int(os.getenv("AUTH_TOKEN_TTL_HOURS", "168"))  # 7 days
     superuser_username: str = os.getenv("SUPERUSER_USERNAME", "adeyehat")
     superuser_password: str = os.getenv("SUPERUSER_PASSWORD", "adeyehat123")
+    # Invoicing: org admins bill the superuser for outstanding points × rate.
+    invoice_point_rate: float = float(os.getenv("INVOICE_POINT_RATE", "1.0"))  # money per point
+    invoice_currency: str = os.getenv("INVOICE_CURRENCY", "USD")
+
     points_accepted: int = int(os.getenv("POINTS_ACCEPTED", "50"))            # new verified capture
     points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "-5"))          # account already captured / others' re-upload (penalty)
     points_self_duplicate: int = int(os.getenv("POINTS_SELF_DUPLICATE", "-10"))  # same user re-uploads the same image (penalty)

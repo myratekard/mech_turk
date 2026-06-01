@@ -71,6 +71,28 @@ def test_dashboard_summary_breakdown(mongo):
     assert any(b["key"] == "accepted" and b["points"] == 50 for b in s["pointsBreakdown"])
 
 
+def test_invoice_flow(mongo):
+    # Two billable submissions (accepted +50, duplicate -5) + one in_review (not billable).
+    _ins("u9", "accepted", 50, org_id="org_a")
+    _ins("u9", "duplicate", -5, org_id="org_a")
+    _ins("u9", "in_review", 0, org_id="org_a")
+    out = msub.outstanding_summary("org_a")
+    assert out["count"] == 2 and out["points"] == 45
+    inv = msub.create_invoice("org_a", created_by=1)
+    assert inv["status"] == "pending" and inv["total_points"] == 45 and inv["submission_count"] == 2
+    # Outstanding now empty (those submissions carry the invoice_id).
+    assert msub.outstanding_summary("org_a")["count"] == 0
+    detail = msub.get_invoice(inv["id"])
+    assert len(detail["items"]) == 2
+    settled, err = msub.settle_invoice(inv["id"], settled_by=2)
+    assert err is None and settled["status"] == "settled"
+    _, err2 = msub.settle_invoice(inv["id"], settled_by=2)
+    assert err2 == "already_settled"
+    # Covered submissions are now marked settled.
+    rows, _ = msub.list_submissions("u9", None, 1, 50)
+    assert sum(1 for r in rows if r.get("settled")) == 2
+
+
 def test_auth_no_seed_and_referrals(mongo):
     mauth.init_auth_db()
     # No superuser is seeded anymore — the DB starts empty.
