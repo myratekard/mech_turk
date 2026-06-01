@@ -5,10 +5,12 @@ import {
   useGetRecentSubmissions,
   getGetRecentSubmissionsQueryKey
 } from "@workspace/api-client-react";
+import { Link } from "wouter";
 import { format } from "date-fns";
-import { Zap, CheckCircle2, Clock, Activity, BarChart3, XCircle, Copy, ImageOff } from "lucide-react";
+import { Zap, CheckCircle2, Clock, Activity, BarChart3, XCircle, Copy, ImageOff, UploadCloud } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 export default function Dashboard() {
   const { data: summary, isLoading: isSummaryLoading } = useGetDashboardSummary({
@@ -43,13 +45,21 @@ export default function Dashboard() {
             <h1 className="text-3xl font-black uppercase tracking-tight">Dashboard</h1>
             <p className="text-muted-foreground font-medium">Here's how you're doing.</p>
           </div>
-          {summary && (
-            <div className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg shadow-sm">
-              <Activity size={16} className="text-primary" />
-              <span className="text-sm font-bold text-muted-foreground">UPDATED TODAY:</span>
-              <span className="text-sm font-black font-mono">{summary.updatedToday}</span>
-            </div>
-          )}
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            {summary && (
+              <div className="flex items-center gap-2 px-4 py-2 bg-card border border-border rounded-lg shadow-sm">
+                <Activity size={16} className="text-primary" />
+                <span className="text-sm font-bold text-muted-foreground">UPDATED TODAY:</span>
+                <span className="text-sm font-black font-mono">{summary.updatedToday}</span>
+              </div>
+            )}
+            <Link href="/upload" className="flex-1 sm:flex-none">
+              <Button className="w-full gap-2 font-bold uppercase tracking-wide bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_15px_rgba(0,255,255,0.3)]">
+                <UploadCloud size={16} />
+                Upload
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Stats Grid */}
