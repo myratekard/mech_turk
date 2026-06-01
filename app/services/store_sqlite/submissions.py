@@ -204,6 +204,15 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
     ]
 
 
+def count_user_regular_duplicates(user_id: str) -> int:
+    """A user's REGULAR duplicates (not self-duplicates) — drives the eased penalty."""
+    with _connect() as conn:
+        return int(conn.execute(
+            "SELECT COUNT(*) c FROM submissions WHERE user_id=? AND status='duplicate' AND points!=?",
+            (user_id, settings.points_self_duplicate),
+        ).fetchone()["c"])
+
+
 def count_user_uploads_since(user_id: str, since_iso: str) -> int:
     with _connect() as conn:
         return int(conn.execute(

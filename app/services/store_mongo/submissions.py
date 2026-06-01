@@ -148,6 +148,13 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
     return out
 
 
+def count_user_regular_duplicates(user_id: str) -> int:
+    """A user's REGULAR duplicates (not self-duplicates) — drives the eased penalty."""
+    return int(_c().count_documents(
+        {"user_id": user_id, "status": "duplicate", "points": {"$ne": settings.points_self_duplicate}}
+    ))
+
+
 def count_user_uploads_since(user_id: str, since_iso: str) -> int:
     return int(_c().count_documents({"user_id": user_id, "created_at": {"$gte": since_iso}}))
 

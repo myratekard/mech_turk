@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from app.api.deps import get_current_user, require_roles, require_superuser
 from app.api.routes.auth import to_user_out
-from app.api.routes.turk import map_status_points, platform_label
+from app.api.routes.turk import map_status_points, platform_label, regular_duplicate_points
 from app.core.config import settings
 from app.schemas.auth_models import (
     CreateOrgInput,
@@ -95,11 +95,12 @@ def approve(submission_id: int, user: dict = Depends(_reviewer)):
 
     # A duplicate of an already-captured account is recorded but earns no points.
     if submissions_db.is_duplicate_capture(acct_platform, acct_handle, exclude_id=submission_id):
+        dup_pts = regular_duplicate_points(row["user_id"])
         submissions_db.update_submission_status(
-            submission_id, "duplicate", settings.points_duplicate, analysis_json=analysis_json,
+            submission_id, "duplicate", dup_pts, analysis_json=analysis_json,
             acct_platform=acct_platform, acct_handle=acct_handle, update_acct=update_acct,
         )
-        return {"ok": True, "id": submission_id, "status": "duplicate", "points": settings.points_duplicate}
+        return {"ok": True, "id": submission_id, "status": "duplicate", "points": dup_pts}
 
     submissions_db.update_submission_status(
         submission_id, "accepted", settings.points_accepted, analysis_json=analysis_json,
@@ -130,7 +131,7 @@ def rerun(submission_id: int, user: dict = Depends(_reviewer)):
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
     if status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle, exclude_id=submission_id):
-        status, points = "duplicate", settings.points_duplicate
+        status, points = "duplicate", regular_duplicate_points(row["user_id"])
     submissions_db.update_submission_status(
         submission_id, status, points, analysis_json=result.model_dump_json(),
         acct_platform=acct_platform, acct_handle=acct_handle, update_acct=True,

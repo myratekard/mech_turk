@@ -71,6 +71,14 @@ def test_dashboard_summary_breakdown(mongo):
     assert any(b["key"] == "accepted" and b["points"] == 50 for b in s["pointsBreakdown"])
 
 
+def test_regular_duplicate_count_excludes_self(mongo):
+    _ins("ud", "duplicate", -5)   # regular
+    _ins("ud", "duplicate", -5)   # regular
+    _ins("ud", "duplicate", -10)  # self-duplicate (excluded)
+    _ins("ud", "accepted", 50)
+    assert msub.count_user_regular_duplicates("ud") == 2
+
+
 def test_invoice_flow(mongo):
     # Two billable submissions (accepted +50, duplicate -5) + one in_review (not billable).
     _ins("u9", "accepted", 50, org_id="org_a")
