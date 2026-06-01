@@ -72,6 +72,7 @@ class Settings:
     # --- Abuse / cost controls ---
     daily_upload_limit: int = int(os.getenv("DAILY_UPLOAD_LIMIT", "200"))  # per user / 24h
     phash_distance: int = int(os.getenv("PHASH_DISTANCE", "5"))            # near-dup bit threshold
+    max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "10"))             # per-image size cap
 
     # Public base URL of the frontend, used to build registration links in emails.
     app_base_url: str = os.getenv("APP_BASE_URL", "http://localhost:5173")
@@ -118,6 +119,10 @@ class Settings:
         if self.db_backend == "sqlite":
             return False
         return bool(self.mongo_uri)
+
+    @property
+    def max_upload_bytes(self) -> int:
+        return self.max_upload_mb * 1024 * 1024
 
     @property
     def use_r2(self) -> bool:

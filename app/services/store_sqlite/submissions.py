@@ -84,6 +84,12 @@ def init_db() -> None:
             )
             """
         )
+        # Migration: invoice payment-receipt columns (proof attached at settle time).
+        inv_cols = {r["name"] for r in conn.execute("PRAGMA table_info(invoices)").fetchall()}
+        if "receipt_object_path" not in inv_cols:
+            conn.execute("ALTER TABLE invoices ADD COLUMN receipt_object_path TEXT")
+        if "receipt_amount" not in inv_cols:
+            conn.execute("ALTER TABLE invoices ADD COLUMN receipt_amount REAL")
 
 
 def insert_submission(
@@ -150,10 +156,14 @@ def normalize_handle(handle: Optional[str]) -> Optional[str]:
 def is_duplicate_capture(
     acct_platform: Optional[str], acct_handle: Optional[str], exclude_id: Optional[int] = None
 ) -> bool:
-    """True if an ACCEPTED submission for the same (platform, handle) already exists."""
+    """True if the same (platform, handle) has already been CLAIMED by any user — i.e. a prior
+    submission that is accepted, awaiting review, or already flagged duplicate. (invalid /
+    unsupported don't count, since those never captured the account.) This is what stops a
+    second person earning points for an account someone else already submitted."""
     if not acct_platform or not acct_handle:
         return False
-    q = "SELECT COUNT(*) c FROM submissions WHERE status='accepted' AND acct_platform=? AND acct_handle=?"
+    q = ("SELECT COUNT(*) c FROM submissions "
+         "WHERE status IN ('accepted','in_review','duplicate') AND acct_platform=? AND acct_handle=?")
     params: list = [acct_platform, acct_handle]
     if exclude_id is not None:
         q += " AND id != ?"
@@ -474,7 +484,10 @@ def get_invoice(invoice_id: int) -> Optional[dict]:
     return d
 
 
-def settle_invoice(invoice_id: int, settled_by) -> Tuple[Optional[dict], Optional[str]]:
+def settle_invoice(
+    invoice_id: int, settled_by, receipt_object_path: Optional[str] = None,
+    receipt_amount: Optional[float] = None,
+) -> Tuple[Optional[dict], Optional[str]]:
     ts = _now()
     with _connect() as conn:
         inv = conn.execute("SELECT * FROM invoices WHERE id=?", (invoice_id,)).fetchone()
@@ -483,8 +496,9 @@ def settle_invoice(invoice_id: int, settled_by) -> Tuple[Optional[dict], Optiona
         if inv["status"] == "settled":
             return None, "already_settled"
         conn.execute(
-            "UPDATE invoices SET status='settled', settled_by=?, settled_at=? WHERE id=?",
-            (str(settled_by), ts, invoice_id),
+            "UPDATE invoices SET status='settled', settled_by=?, settled_at=?, "
+            "receipt_object_path=?, receipt_amount=? WHERE id=?",
+            (str(settled_by), ts, receipt_object_path, receipt_amount, invoice_id),
         )
         conn.execute("UPDATE submissions SET settled=1, settled_at=? WHERE invoice_id=?", (ts, invoice_id))
         updated = conn.execute("SELECT * FROM invoices WHERE id=?", (invoice_id,)).fetchone()

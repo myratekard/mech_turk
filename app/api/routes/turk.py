@@ -96,6 +96,11 @@ async def upload_object(object_id: str, request: Request):
     data = await request.body()
     if not data:
         raise HTTPException(status_code=400, detail="Empty upload body")
+    if len(data) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Image is too large (max {settings.max_upload_mb} MB).",
+        )
     storage.save_bytes(object_id, data)
     return {"ok": True, "objectPath": storage.object_path_for(object_id)}
 
@@ -157,6 +162,10 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     data = storage.read_object(body.objectPath)
     if data is None:
         raise HTTPException(status_code=400, detail="Uploaded object not found")
+    if len(data) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=413, detail=f"Image is too large (max {settings.max_upload_mb} MB)."
+        )
 
     uid = str(user["id"])
 
