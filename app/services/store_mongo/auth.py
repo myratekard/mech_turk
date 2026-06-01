@@ -37,6 +37,10 @@ def _invites():
     return col("turk_admin_invites")
 
 
+def _org_admin_invites():
+    return col("pending_org_admins")
+
+
 def _slugify(name: str) -> str:
     s = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")
     return s or "org"
@@ -167,6 +171,25 @@ def is_pending_turk_admin(email: Optional[str]) -> bool:
 
 def mark_turk_admin_invite_used(email: str) -> None:
     _invites().update_one({"email": email.lower()}, {"$set": {"used_at": _now()}})
+
+
+def add_pending_org_admin(email: str, clerk_org_id: str) -> None:
+    _org_admin_invites().update_one(
+        {"email": email.lower()},
+        {"$set": {"clerk_org_id": clerk_org_id, "used_at": None}, "$setOnInsert": {"created_at": _now()}},
+        upsert=True,
+    )
+
+
+def get_pending_org_admin(email: Optional[str]) -> Optional[str]:
+    if not email:
+        return None
+    doc = _org_admin_invites().find_one({"email": email.lower(), "used_at": None})
+    return doc["clerk_org_id"] if doc else None
+
+
+def mark_org_admin_invite_used(email: str) -> None:
+    _org_admin_invites().update_one({"email": email.lower()}, {"$set": {"used_at": _now()}})
 
 
 # ----------------------------------------------------------------- clerk orgs

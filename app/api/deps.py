@@ -29,20 +29,26 @@ def get_current_user(authorization: Optional[str] = Header(default=None)) -> dic
     if user.get("blocked"):
         raise HTTPException(status_code=403, detail="This account has been blocked")
 
-    org_id, org_role = org_from_claims(claims)
+    claims_org_id, claims_org_role = org_from_claims(claims)
+    # The Clerk session token only carries org claims when an org is ACTIVE in the session, which
+    # isn't reliably the case for invited/added members. Fall back to our DB mirror so an org's
+    # admin/member keeps their role on every request regardless of active-org state.
+    org_id = claims_org_id or user.get("clerk_org_id")
+    org_role = claims_org_role if claims_org_id else user.get("clerk_org_role")
+
     # Effective role: app-level flags (superuser, turk_admin) win; otherwise derive
-    # from the Clerk org role (org:admin -> admin, org:member -> user).
+    # from the org role (org:admin -> admin, org:member -> user).
     db_role = user.get("role")
     if db_role in ("superuser", "turk_admin"):
         effective_role = db_role
     else:
         effective_role = _ORG_ROLE_MAP.get(org_role or "", "user")
 
-    # Lazily mirror the active org + role so analytics/listing/referral-validation work.
-    if org_id and (user.get("clerk_org_id") != org_id or user.get("clerk_org_role") != org_role):
-        auth_db.set_user_clerk_org(user["id"], org_id, org_role)
-        user["clerk_org_id"] = org_id
-        user["clerk_org_role"] = org_role
+    # Lazily mirror the active org + role (only when it actually came from the session claims).
+    if claims_org_id and (user.get("clerk_org_id") != claims_org_id or user.get("clerk_org_role") != claims_org_role):
+        auth_db.set_user_clerk_org(user["id"], claims_org_id, claims_org_role)
+        user["clerk_org_id"] = claims_org_id
+        user["clerk_org_role"] = claims_org_role
 
     user = {**user, "role": effective_role, "org_id": org_id}
     return user

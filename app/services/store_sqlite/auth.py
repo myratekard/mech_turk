@@ -93,6 +93,18 @@ def init_auth_db() -> None:
             )
             """
         )
+        # Superuser-issued ORG admin assignments, matched by email at sign-in (so an org admin
+        # works even if the Clerk org-membership/invite flow doesn't carry over).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pending_org_admins (
+                email        TEXT PRIMARY KEY,
+                clerk_org_id TEXT,
+                created_at   TEXT,
+                used_at      TEXT
+            )
+            """
+        )
         # Label mirror for Clerk orgs (Clerk is source of truth; this is for display/listing).
         conn.execute(
             """
@@ -239,6 +251,33 @@ def is_pending_turk_admin(email: Optional[str]) -> bool:
 def mark_turk_admin_invite_used(email: str) -> None:
     with _connect() as conn:
         conn.execute("UPDATE turk_admin_invites SET used_at=? WHERE email=?", (_now(), email.lower()))
+
+
+# ----------------------------------------------------- org-admin assignments (by email)
+def add_pending_org_admin(email: str, clerk_org_id: str) -> None:
+    with _connect() as conn:
+        conn.execute(
+            "INSERT INTO pending_org_admins (email, clerk_org_id, created_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(email) DO UPDATE SET clerk_org_id=excluded.clerk_org_id, used_at=NULL",
+            (email.lower(), clerk_org_id, _now()),
+        )
+
+
+def get_pending_org_admin(email: Optional[str]) -> Optional[str]:
+    """Return the clerk_org_id this email was assigned admin of (unused), or None."""
+    if not email:
+        return None
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT clerk_org_id FROM pending_org_admins WHERE email=? AND used_at IS NULL",
+            (email.lower(),),
+        ).fetchone()
+    return row["clerk_org_id"] if row else None
+
+
+def mark_org_admin_invite_used(email: str) -> None:
+    with _connect() as conn:
+        conn.execute("UPDATE pending_org_admins SET used_at=? WHERE email=?", (_now(), email.lower()))
 
 
 # ----------------------------------------------------------------- clerk orgs
