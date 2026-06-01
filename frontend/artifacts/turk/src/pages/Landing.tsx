@@ -7,7 +7,7 @@ export default function Landing() {
   const [, setLocation] = useLocation();
 
   const features = [
-    { icon: ShieldCheck, title: "Verified creators", desc: "We collect accounts carrying the official verified badge — blue, gold or grey — belonging to creators of African descent." },
+    { icon: ShieldCheck, title: "Verified creators", desc: "We collect accounts carrying the official verified badge, belonging to creators of African descent." },
     { icon: UploadCloud, title: "Snap & upload", desc: "Screenshot a verified profile on your phone and drop it in. Each one is checked and added in seconds." },
     { icon: BarChart3, title: "Earn & track", desc: "Every new verified account you add earns points. Watch your total climb on your dashboard and the leaderboard." },
   ];
