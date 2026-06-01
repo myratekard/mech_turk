@@ -190,6 +190,11 @@ export default function Submissions() {
                             <AlertTriangle size={11} /> Duplicate image
                           </div>
                         )}
+                        {(sub as any).dupKind === "regular" && (
+                          <div className="text-[10px] text-amber-500 mt-1 flex items-center gap-1" title="This account has already been captured">
+                            <AlertTriangle size={11} /> Exists
+                          </div>
+                        )}
                         {(sub as any).settled && (
                           <div className="text-[10px] text-green-500 mt-1 flex items-center gap-1" title="Paid out to your organization">
                             <CheckCircle2 size={11} /> Settled{(sub as any).settledVia ? ` via ${(sub as any).settledVia}` : ""}
