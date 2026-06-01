@@ -59,14 +59,14 @@ class Settings:
     invoice_currency: str = os.getenv("INVOICE_CURRENCY", "USD")
 
     points_accepted: int = int(os.getenv("POINTS_ACCEPTED", "50"))            # new verified capture
-    points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "-5"))          # account already captured / others' re-upload (penalty)
+    points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "-2"))          # regular duplicate, first tier (penalty)
     points_self_duplicate: int = int(os.getenv("POINTS_SELF_DUPLICATE", "-10"))  # self re-upload, final tier (penalty)
-    # After a user racks up this many regular duplicates, the penalty eases off (to -2).
-    points_duplicate_reduced: int = int(os.getenv("POINTS_DUPLICATE_REDUCED", "-2"))
-    duplicate_reduce_threshold: int = int(os.getenv("DUPLICATE_REDUCE_THRESHOLD", "20"))
+    # After a user racks up this many regular duplicates, the penalty escalates (to -5).
+    points_duplicate_escalated: int = int(os.getenv("POINTS_DUPLICATE_ESCALATED", "-5"))
+    duplicate_escalate_threshold: int = int(os.getenv("DUPLICATE_ESCALATE_THRESHOLD", "20"))
     # Self-duplicate escalation: first N = warning (0 pts), next M = mid penalty, then -10.
     self_dup_warn_count: int = int(os.getenv("SELF_DUP_WARN_COUNT", "5"))
-    self_dup_mid_count: int = int(os.getenv("SELF_DUP_MID_COUNT", "20"))
+    self_dup_mid_count: int = int(os.getenv("SELF_DUP_MID_COUNT", "15"))
     self_dup_mid_penalty: int = int(os.getenv("SELF_DUP_MID_PENALTY", "-5"))
 
     # --- Abuse / cost controls ---

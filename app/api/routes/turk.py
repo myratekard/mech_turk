@@ -56,10 +56,11 @@ def platform_label(result) -> str:
 
 
 def regular_duplicate_points(user_id) -> int:
-    """Regular-duplicate penalty, eased (to points_duplicate_reduced) once the user passes
-    duplicate_reduce_threshold regular duplicates."""
-    if submissions_db.count_user_regular_duplicates(str(user_id)) >= settings.duplicate_reduce_threshold:
-        return settings.points_duplicate_reduced
+    """Regular-duplicate penalty: points_duplicate (-2) by default, escalating to
+    points_duplicate_escalated (-5) once the user passes duplicate_escalate_threshold
+    regular duplicates."""
+    if submissions_db.count_user_regular_duplicates(str(user_id)) >= settings.duplicate_escalate_threshold:
+        return settings.points_duplicate_escalated
     return settings.points_duplicate
 
 
