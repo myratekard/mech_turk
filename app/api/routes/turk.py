@@ -203,8 +203,16 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     mime, _ = mimetypes.guess_type(body.fileName or body.objectPath)
     try:
         result = run_pipeline(data, mime=mime or "image/jpeg", persist=False, force_profile=True)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Analysis failed: {e}")
+    except Exception:
+        # LLM unavailable (after retries) — don't lose the upload or reject the user. Record
+        # it and route to the human review queue instead.
+        row = submissions_db.insert_submission(
+            user_id=uid, org_id=user.get("org_id"), image_url=body.imageUrl,
+            object_path=body.objectPath, file_name=body.fileName,
+            platform=body.platform, status="in_review", points=0,
+            analysis_json=None, image_hash=img_hash,
+        )
+        return _row_to_submission(row)
 
     status, points = map_status_points(result)
     platform = body.platform or platform_label(result)
