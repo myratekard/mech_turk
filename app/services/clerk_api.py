@@ -49,6 +49,13 @@ def get_organization(org_id: str) -> dict:
     return _request("GET", f"/organizations/{org_id}")
 
 
+def get_user_org_memberships(clerk_user_id: str, limit: int = 10) -> list[dict]:
+    """A user's organization memberships [{organization:{id,name}, role}, ...]. Used to
+    provision an invited member even when their session token has no ACTIVE org set yet."""
+    res = _request("GET", f"/users/{clerk_user_id}/organization_memberships?limit={limit}")
+    return res.get("data", res) if isinstance(res, dict) else res
+
+
 def create_organization_invitation(org_id: str, email: str, role: str = "org:admin",
                                    inviter_user_id: Optional[str] = None,
                                    redirect_url: Optional[str] = None) -> dict:
