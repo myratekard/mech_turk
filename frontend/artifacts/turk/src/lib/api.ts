@@ -147,6 +147,7 @@ export const api = {
     apiFetch<{ items: ReviewItem[]; total: number; page: number; limit: number }>(
       `/api/admin/review-queue?page=${page}&limit=${limit}`,
     ),
+  reviewCount: () => apiFetch<{ count: number }>("/api/admin/review-queue/count"),
   approve: (id: number) => apiFetch(`/api/admin/submissions/${id}/approve`, { method: "POST" }),
   reject: (id: number) => apiFetch(`/api/admin/submissions/${id}/reject`, { method: "POST" }),
   rerun: (id: number) => apiFetch(`/api/admin/submissions/${id}/rerun`, { method: "POST" }),

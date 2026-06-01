@@ -118,6 +118,11 @@ def insert_submission(
 
 
 # --------------------------------------------------------------- review queue
+def count_review_queue() -> int:
+    with _connect() as conn:
+        return int(conn.execute("SELECT COUNT(*) c FROM submissions WHERE status='in_review'").fetchone()["c"])
+
+
 def list_review_queue(page: int, limit: int) -> Tuple[List[dict], int]:
     """Global pool of in_review submissions across all users/orgs."""
     offset = (page - 1) * limit

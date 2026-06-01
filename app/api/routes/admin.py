@@ -62,6 +62,12 @@ def _row_to_review_item(row: dict) -> ReviewItem:
 
 
 # ----------------------------------------------------------------- review queue
+@router.get("/review-queue/count")
+def review_queue_count(_: dict = Depends(_reviewer)):
+    """Lightweight pending-review count for the reviewer's nav notification."""
+    return {"count": submissions_db.count_review_queue()}
+
+
 @router.get("/review-queue", response_model=ReviewQueue)
 def review_queue(
     page: int = Query(default=1, ge=1),

@@ -79,6 +79,10 @@ def insert_submission(
 
 
 # --------------------------------------------------------------- review queue
+def count_review_queue() -> int:
+    return int(_c().count_documents({"status": "in_review"}))
+
+
 def list_review_queue(page: int, limit: int) -> Tuple[List[dict], int]:
     c = _c()
     total = c.count_documents({"status": "in_review"})

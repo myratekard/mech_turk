@@ -1,10 +1,11 @@
-import { ReactNode, useState } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation } from "wouter";
 import { Activity, UploadCloud, LayoutDashboard, BookOpen, ShieldCheck, Building2, Users as UsersIcon, GitBranch, LogOut, BarChart3, Menu, Receipt } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { useAuth } from "@/lib/auth";
+import { api } from "@/lib/api";
 
 interface ShellProps {
   children: ReactNode;
@@ -14,6 +15,17 @@ export function Shell({ children }: ShellProps) {
   const [location] = useLocation();
   const { user, logout, isAdmin, isSuperuser, isOrgAdmin, canReview } = useAuth();
   const [navOpen, setNavOpen] = useState(false);
+  const [reviewCount, setReviewCount] = useState(0);
+
+  // Reviewers (superuser/turk_admin) get a live count of pending submissions on the Review nav.
+  useEffect(() => {
+    if (!canReview) return;
+    let alive = true;
+    const tick = () => api.reviewCount().then((r) => alive && setReviewCount(r.count)).catch(() => {});
+    tick();
+    const id = setInterval(tick, 20000);
+    return () => { alive = false; clearInterval(id); };
+  }, [canReview]);
 
   const initials = (user?.username || "user").slice(0, 2).toUpperCase();
   const avatar = `data:image/svg+xml;utf8,${encodeURIComponent(
@@ -21,12 +33,12 @@ export function Shell({ children }: ShellProps) {
   )}`;
 
   // Nav is role-aware: base items for everyone, admin items gated.
-  const navItems: { href: string; icon: any; label: string }[] = [
+  const navItems: { href: string; icon: any; label: string; badge?: number }[] = [
     { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/upload", icon: UploadCloud, label: "Upload" },
     { href: "/submissions", icon: Activity, label: "Submissions" },
     ...(isOrgAdmin ? [{ href: "/referrals", icon: GitBranch, label: "Referrals" }] : []),
-    ...(canReview ? [{ href: "/admin/review", icon: ShieldCheck, label: "Review" }] : []),
+    ...(canReview ? [{ href: "/admin/review", icon: ShieldCheck, label: "Review", badge: reviewCount }] : []),
     ...(isAdmin ? [{ href: "/admin/analytics", icon: BarChart3, label: "Analytics" }] : []),
     ...((isOrgAdmin || isSuperuser) ? [{ href: "/admin/invoices", icon: Receipt, label: "Invoices" }] : []),
     ...(isOrgAdmin ? [{ href: "/admin/staff", icon: UsersIcon, label: "Staff" }] : []),
@@ -64,6 +76,11 @@ export function Shell({ children }: ShellProps) {
                   className={cn("transition-colors", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")}
                 />
                 {item.label}
+                {item.badge ? (
+                  <span className="ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-black shadow-[0_0_10px_rgba(0,255,255,0.4)]">
+                    {item.badge}
+                  </span>
+                ) : null}
               </span>
             </Link>
           );
@@ -110,8 +127,11 @@ export function Shell({ children }: ShellProps) {
         </div>
         <Sheet open={navOpen} onOpenChange={setNavOpen}>
           <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="Open navigation" data-testid="button-nav-menu">
+            <Button variant="ghost" size="icon" aria-label="Open navigation" data-testid="button-nav-menu" className="relative">
               <Menu size={22} />
+              {canReview && reviewCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary shadow-[0_0_8px_rgba(0,255,255,0.6)]" />
+              )}
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 w-72 bg-card border-border">
