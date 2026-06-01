@@ -9,7 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ChevronLeft, ChevronRight, Activity, ExternalLink, Filter, Flag, CheckCircle2 } from "lucide-react";
+import { Link } from "wouter";
+import { ChevronLeft, ChevronRight, Activity, ExternalLink, Filter, Flag, CheckCircle2, UploadCloud } from "lucide-react";
 import type { ListSubmissionsStatus } from "@workspace/api-client-react";
 
 const DISPUTABLE = ["accepted", "invalid"];
@@ -93,7 +94,8 @@ export default function Submissions() {
             <p className="text-muted-foreground font-medium">History of your operations and earnings.</p>
           </div>
           
-          <div className="flex items-center gap-3 bg-card border border-border rounded-lg p-1">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-3 bg-card border border-border rounded-lg p-1 flex-1 sm:flex-none">
             <div className="px-3 flex items-center gap-2 text-muted-foreground">
               <Filter size={14} />
               <span className="text-xs font-bold uppercase tracking-wider">Filter:</span>
@@ -114,6 +116,12 @@ export default function Submissions() {
                 <SelectItem value="unsupported">UNSUPPORTED</SelectItem>
               </SelectContent>
             </Select>
+            </div>
+            <Link href="/upload">
+              <Button className="gap-2 font-bold uppercase tracking-wide bg-primary text-primary-foreground hover:bg-primary/90 shadow-[0_0_15px_rgba(0,255,255,0.3)]">
+                <UploadCloud size={16} /> Upload
+              </Button>
+            </Link>
           </div>
         </div>
 
@@ -184,8 +192,8 @@ export default function Submissions() {
                         )}
                       </TableCell>
                       <TableCell>
-                        <span className="font-black font-mono text-primary tracking-tight">
-                          {sub.points > 0 ? `+${sub.points}` : "-"}
+                        <span className={`font-black font-mono tracking-tight ${sub.points > 0 ? "text-primary" : sub.points < 0 ? "text-red-500" : "text-muted-foreground"}`}>
+                          {sub.points > 0 ? `+${sub.points}` : sub.points < 0 ? sub.points : "—"}
                         </span>
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground font-mono text-xs">

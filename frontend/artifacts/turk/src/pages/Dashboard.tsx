@@ -167,7 +167,9 @@ export default function Dashboard() {
                       <div className="flex items-center gap-3 text-xs text-muted-foreground font-mono">
                         <span>{format(new Date(sub.createdAt), "MMM d, yyyy HH:mm")}</span>
                         <span className="w-1 h-1 rounded-full bg-border"></span>
-                        <span className="text-primary font-bold">+{sub.points} PTS</span>
+                        <span className={`font-bold ${sub.points > 0 ? "text-primary" : sub.points < 0 ? "text-red-500" : "text-muted-foreground"}`}>
+                          {sub.points > 0 ? `+${sub.points}` : sub.points} PTS
+                        </span>
                       </div>
                     </div>
                     <div className="text-right">
