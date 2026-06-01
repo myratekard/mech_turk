@@ -71,12 +71,13 @@ def test_dashboard_summary_breakdown(mongo):
     assert any(b["key"] == "accepted" and b["points"] == 50 for b in s["pointsBreakdown"])
 
 
-def test_regular_duplicate_count_excludes_self(mongo):
-    _ins("ud", "duplicate", -5)   # regular
-    _ins("ud", "duplicate", -5)   # regular
-    _ins("ud", "duplicate", -10)  # self-duplicate (excluded)
+def test_duplicate_kind_counts(mongo):
+    _ins("ud", "duplicate", -5, dup_kind="regular")
+    _ins("ud", "duplicate", -5, dup_kind="regular")
+    _ins("ud", "duplicate", -10, dup_kind="self")
     _ins("ud", "accepted", 50)
     assert msub.count_user_regular_duplicates("ud") == 2
+    assert msub.count_user_self_duplicates("ud") == 1
 
 
 def test_invoice_flow(mongo):

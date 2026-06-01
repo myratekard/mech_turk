@@ -67,6 +67,8 @@ def init_db() -> None:
             conn.execute("ALTER TABLE submissions ADD COLUMN settled INTEGER NOT NULL DEFAULT 0")
         if "settled_at" not in cols:
             conn.execute("ALTER TABLE submissions ADD COLUMN settled_at TEXT")
+        if "dup_kind" not in cols:
+            conn.execute("ALTER TABLE submissions ADD COLUMN dup_kind TEXT")  # 'self' | 'regular' | null
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS invoices (
@@ -98,6 +100,7 @@ def insert_submission(
     acct_platform: Optional[str] = None,
     acct_handle: Optional[str] = None,
     image_hash: Optional[str] = None,
+    dup_kind: Optional[str] = None,
 ) -> dict:
     ts = _now()
     with _connect() as conn:
@@ -105,11 +108,11 @@ def insert_submission(
             """
             INSERT INTO submissions
                 (user_id, org_id, image_url, object_path, file_name, platform, status, points,
-                 analysis_json, acct_platform, acct_handle, image_hash, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 analysis_json, acct_platform, acct_handle, image_hash, dup_kind, created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (user_id, org_id, image_url, object_path, file_name, platform, status, points,
-             analysis_json, acct_platform, acct_handle, image_hash, ts, ts),
+             analysis_json, acct_platform, acct_handle, image_hash, dup_kind, ts, ts),
         )
         row = conn.execute(
             "SELECT * FROM submissions WHERE id = ?", (cur.lastrowid,)
@@ -209,13 +212,21 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
     ]
 
 
-def count_user_regular_duplicates(user_id: str) -> int:
-    """A user's REGULAR duplicates (not self-duplicates) — drives the eased penalty."""
+def count_user_duplicates(user_id: str, dup_kind: str) -> int:
+    """Count a user's duplicates of a given kind ('regular' or 'self')."""
     with _connect() as conn:
         return int(conn.execute(
-            "SELECT COUNT(*) c FROM submissions WHERE user_id=? AND status='duplicate' AND points!=?",
-            (user_id, settings.points_self_duplicate),
+            "SELECT COUNT(*) c FROM submissions WHERE user_id=? AND status='duplicate' AND dup_kind=?",
+            (user_id, dup_kind),
         ).fetchone()["c"])
+
+
+def count_user_regular_duplicates(user_id: str) -> int:
+    return count_user_duplicates(user_id, "regular")
+
+
+def count_user_self_duplicates(user_id: str) -> int:
+    return count_user_duplicates(user_id, "self")
 
 
 def count_user_uploads_since(user_id: str, since_iso: str) -> int:
@@ -264,7 +275,7 @@ def get_submission_any(submission_id: int) -> Optional[dict]:
 def update_submission_status(
     submission_id: int, status: str, points: int, analysis_json: Optional[str] = None,
     acct_platform: Optional[str] = None, acct_handle: Optional[str] = None,
-    update_acct: bool = False,
+    update_acct: bool = False, dup_kind: Optional[str] = None,
 ) -> Optional[dict]:
     sets = ["status=?", "points=?", "updated_at=?"]
     params: list = [status, points, _now()]
@@ -274,6 +285,9 @@ def update_submission_status(
     if update_acct:
         sets += ["acct_platform=?", "acct_handle=?"]
         params += [acct_platform, acct_handle]
+    if dup_kind is not None:
+        sets.append("dup_kind=?")
+        params.append(dup_kind)
     params.append(submission_id)
     with _connect() as conn:
         conn.execute(f"UPDATE submissions SET {', '.join(sets)} WHERE id=?", params)

@@ -7,9 +7,9 @@ export default function Landing() {
   const [, setLocation] = useLocation();
 
   const features = [
-    { icon: UploadCloud, title: "Snap & Upload", desc: "Screenshot a verified social profile and drop it in. Takes seconds." },
-    { icon: ShieldCheck, title: "Verified Only", desc: "Make sure the account has the official verified badge — that's what counts." },
-    { icon: BarChart3, title: "Track & Earn", desc: "Accepted uploads earn points. Watch your earnings climb." },
+    { icon: ShieldCheck, title: "Verified creators", desc: "We collect accounts carrying the official verified badge — blue, gold or grey — belonging to creators of African descent." },
+    { icon: UploadCloud, title: "Snap & upload", desc: "Screenshot a verified profile on your phone and drop it in. Each one is checked and added in seconds." },
+    { icon: BarChart3, title: "Earn & track", desc: "Every new verified account you add earns points. Watch your total climb on your dashboard and the leaderboard." },
   ];
 
   return (
@@ -35,11 +35,16 @@ export default function Landing() {
             <span className="text-xs font-mono font-medium text-muted-foreground uppercase tracking-wider">Now open</span>
           </div>
           <h1 className="text-4xl md:text-6xl font-black uppercase tracking-tight leading-[1.05] mb-6">
-            Screenshot. Submit.<br />
+            Spot it. Screenshot it.<br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary">Earn.</span>
           </h1>
-          <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-10">
-            Upload screenshots and earn points on the leaderboard.
+          <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-4 leading-relaxed">
+            TURK is a community directory of <span className="text-foreground font-semibold">verified social
+            accounts of African-descent creators</span>. Find a verified creator on Instagram, X or TikTok,
+            screenshot their profile on your phone, and upload it.
+          </p>
+          <p className="text-muted-foreground text-sm max-w-2xl mx-auto mb-10">
+            You earn points for every verified account you contribute — no fakes, no duplicates, just real verified profiles.
           </p>
           <div className="flex items-center justify-center gap-3">
             <Button onClick={() => setLocation("/login")} className="font-bold uppercase tracking-wider gap-2 shadow-[0_0_15px_rgba(0,255,255,0.3)]">

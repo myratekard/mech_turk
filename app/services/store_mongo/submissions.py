@@ -51,6 +51,7 @@ def insert_submission(
     acct_platform: Optional[str] = None,
     acct_handle: Optional[str] = None,
     image_hash: Optional[str] = None,
+    dup_kind: Optional[str] = None,
 ) -> dict:
     ts = _now()
     doc = {
@@ -68,6 +69,7 @@ def insert_submission(
         "acct_handle": acct_handle,
         "image_hash": image_hash,
         "disputed": 0,
+        "dup_kind": dup_kind,
         "invoice_id": None,
         "settled": 0,
         "settled_at": None,
@@ -152,11 +154,16 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
     return out
 
 
+def count_user_duplicates(user_id: str, dup_kind: str) -> int:
+    return int(_c().count_documents({"user_id": user_id, "status": "duplicate", "dup_kind": dup_kind}))
+
+
 def count_user_regular_duplicates(user_id: str) -> int:
-    """A user's REGULAR duplicates (not self-duplicates) — drives the eased penalty."""
-    return int(_c().count_documents(
-        {"user_id": user_id, "status": "duplicate", "points": {"$ne": settings.points_self_duplicate}}
-    ))
+    return count_user_duplicates(user_id, "regular")
+
+
+def count_user_self_duplicates(user_id: str) -> int:
+    return count_user_duplicates(user_id, "self")
 
 
 def count_user_uploads_since(user_id: str, since_iso: str) -> int:
@@ -190,7 +197,7 @@ def get_submission_any(submission_id: int) -> Optional[dict]:
 def update_submission_status(
     submission_id: int, status: str, points: int, analysis_json: Optional[str] = None,
     acct_platform: Optional[str] = None, acct_handle: Optional[str] = None,
-    update_acct: bool = False,
+    update_acct: bool = False, dup_kind: Optional[str] = None,
 ) -> Optional[dict]:
     sets: dict = {"status": status, "points": points, "updated_at": _now()}
     if analysis_json is not None:
@@ -198,6 +205,8 @@ def update_submission_status(
     if update_acct:
         sets["acct_platform"] = acct_platform
         sets["acct_handle"] = acct_handle
+    if dup_kind is not None:
+        sets["dup_kind"] = dup_kind
     _c().update_one({"id": submission_id}, {"$set": sets})
     return _c().find_one({"id": submission_id}, {"_id": 0})
 

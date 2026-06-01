@@ -17,38 +17,39 @@ import {
   ArrowRight,
   Smartphone,
   Maximize2,
+  ShieldCheck,
 } from "lucide-react";
 
 const steps = [
   {
     number: "01",
-    icon: UploadCloud,
-    title: "Upload a Mobile Screenshot",
+    icon: ShieldCheck,
+    title: "Find a verified creator",
     color: "text-primary",
     bg: "bg-primary/10",
     border: "border-primary/20",
     description:
-      "Go to the Upload page and drag & drop or select one or more screenshots taken on your phone (JPG, PNG, WEBP). Make sure the display name, @handle and the verified badge are fully visible and uncropped. Each file uploads individually so you can track progress per item.",
+      "On Instagram, X (Twitter) or TikTok, find a creator of African descent who has the official verified badge next to their name — blue, or gold/grey on X. That badge is what we're collecting.",
   },
   {
     number: "02",
-    icon: Clock,
-    title: "In Review",
-    color: "text-amber-500",
-    bg: "bg-amber-500/10",
-    border: "border-amber-500/20",
+    icon: Smartphone,
+    title: "Screenshot it on your phone",
+    color: "text-secondary",
+    bg: "bg-secondary/10",
+    border: "border-secondary/20",
     description:
-      "Once submitted, your screenshot enters the review queue. We check each submission to make sure it meets the guidelines. This usually takes a short time.",
+      "Open their profile in the app and take a screenshot showing the display name, @handle and the verified badge — full and uncropped. One profile per screenshot.",
   },
   {
     number: "03",
-    icon: CheckCircle2,
-    title: "Accepted — Points Awarded",
+    icon: UploadCloud,
+    title: "Upload it and earn",
     color: "text-green-500",
     bg: "bg-green-500/10",
     border: "border-green-500/20",
     description:
-      "Approved submissions are marked Accepted and points are added to your account — 50 points for a new verified account. Check your dashboard to see your total.",
+      "Upload the screenshot on the Upload page. Each new verified account earns you 50 points — watch your total climb on your dashboard.",
   },
 ];
 
@@ -87,9 +88,12 @@ export default function Instructions() {
     <Shell>
       <div className="flex-1 p-6 md:p-8 max-w-4xl mx-auto w-full">
         <div className="mb-10">
-          <h1 className="text-3xl font-black uppercase tracking-tight mb-2">How It Works</h1>
-          <p className="text-muted-foreground font-medium">
-            Everything you need to know to start submitting and earning points.
+          <h1 className="text-3xl font-black uppercase tracking-tight mb-2">What To Do</h1>
+          <p className="text-muted-foreground font-medium leading-relaxed">
+            TURK is building a directory of <span className="text-foreground font-semibold">verified social
+            accounts of African-descent creators</span>. Your task is simple: find a verified creator on
+            Instagram, X or TikTok, screenshot their profile on your phone, and upload it here — you earn
+            points for every new verified account you add.
           </p>
         </div>
 
@@ -156,7 +160,7 @@ export default function Instructions() {
         {/* Steps */}
         <section className="mb-12">
           <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-6">
-            Submission Flow
+            Your 3 Steps
           </h2>
           <div className="space-y-4">
             {steps.map((step) => (
