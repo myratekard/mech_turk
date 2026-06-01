@@ -25,7 +25,7 @@ export default function Register() {
       </div>
       {ref && info?.valid && (
         <p className="text-sm text-muted-foreground -mb-2">
-          Joining <span className="text-foreground font-semibold">{info.orgName || "the platform"}</span>
+          Joining <span className="text-foreground font-semibold">{info.orgName || "your organization"}</span>
           {" "}as <span className="uppercase text-primary font-bold">{info.role}</span>
         </p>
       )}

@@ -43,6 +43,12 @@ def create_organization(name: str, created_by_clerk_id: str) -> dict:
     return _request("POST", "/organizations", {"name": name, "created_by": created_by_clerk_id})
 
 
+def get_organization(org_id: str) -> dict:
+    """Fetch an organization (by id or slug) — used to recover an org's name when our
+    local mirror is missing it (e.g. orgs created outside the create_org flow)."""
+    return _request("GET", f"/organizations/{org_id}")
+
+
 def create_organization_invitation(org_id: str, email: str, role: str = "org:admin",
                                    inviter_user_id: Optional[str] = None,
                                    redirect_url: Optional[str] = None) -> dict:

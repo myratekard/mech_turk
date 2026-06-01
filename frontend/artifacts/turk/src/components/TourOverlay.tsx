@@ -4,8 +4,10 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, ArrowLeft, X } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 
-const TOUR_DONE_KEY = "turk_tour_done";
-const TOUR_STEP_KEY = "turk_tour_step";
+// Per-user keys: signing into a different account on the same browser gets its own tour
+// state, so a fresh account always sees the walkthrough.
+const doneKey = (id: string | number) => `turk_tour_done:${id}`;
+const stepKey = (id: string | number) => `turk_tour_step:${id}`;
 
 interface Step {
   page: string;
@@ -130,12 +132,12 @@ export function TourOverlay() {
   // tour is always visible — even if the user reloaded on a different page mid-tour.
   useEffect(() => {
     if (!user || error || steps.length === 0) return;
-    if (localStorage.getItem(TOUR_DONE_KEY)) return;
+    if (localStorage.getItem(doneKey(user.id))) return;
     if (step !== null) return; // already initialized this session
-    const stored = sessionStorage.getItem(TOUR_STEP_KEY);
+    const stored = sessionStorage.getItem(stepKey(user.id));
     let s = stored !== null ? parseInt(stored, 10) : 0;
     if (isNaN(s) || s < 0 || s >= steps.length) s = 0;
-    sessionStorage.setItem(TOUR_STEP_KEY, String(s));
+    sessionStorage.setItem(stepKey(user.id), String(s));
     setStep(s);
     if (steps[s].page !== location) navigate(steps[s].page);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -175,21 +177,23 @@ export function TourOverlay() {
   }, [findTarget]);
 
   const dismiss = useCallback(() => {
-    localStorage.setItem(TOUR_DONE_KEY, "1");
-    sessionStorage.removeItem(TOUR_STEP_KEY);
+    if (user) {
+      localStorage.setItem(doneKey(user.id), "1");
+      sessionStorage.removeItem(stepKey(user.id));
+    }
     setStep(null);
-  }, []);
+  }, [user]);
 
   const go = useCallback((next: number) => {
     if (next >= steps.length) { dismiss(); return; }
-    sessionStorage.setItem(TOUR_STEP_KEY, String(next));
+    if (user) sessionStorage.setItem(stepKey(user.id), String(next));
     setStep(next);
     const nextPage = steps[next].page;
     if (nextPage !== location) navigate(nextPage);
-  }, [location, navigate, dismiss, steps]);
+  }, [location, navigate, dismiss, steps, user]);
 
   if (!user || error) return null;
-  if (step === null || localStorage.getItem(TOUR_DONE_KEY)) return null;
+  if (step === null || localStorage.getItem(doneKey(user.id))) return null;
   const cur = steps[step];
   if (!cur || location !== cur.page) return null;
 
