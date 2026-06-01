@@ -95,6 +95,8 @@ class InvoiceOut(BaseModel):
     createdAt: str
     settledBy: Optional[str] = None
     settledAt: Optional[str] = None
+    receiptAmount: Optional[float] = None      # amount read from the payment receipt
+    receiptImageUrl: Optional[str] = None      # the receipt screenshot, for the org admin to view
 
 
 class InvoiceLineItem(BaseModel):
@@ -108,8 +110,23 @@ class InvoiceLineItem(BaseModel):
     createdAt: str
 
 
+class InvoicePayee(BaseModel):
+    """Per-user payment breakdown within an invoice (who gets paid, how much)."""
+    userId: str
+    username: Optional[str] = None
+    email: Optional[str] = None
+    submissionCount: int
+    points: int
+    amount: float
+
+
 class InvoiceDetail(InvoiceOut):
     items: List[InvoiceLineItem] = []
+    payees: List[InvoicePayee] = []
+
+
+class SettleInvoiceInput(BaseModel):
+    objectPath: str   # uploaded bank-receipt screenshot, verified before settling
 
 
 class OutstandingSummary(BaseModel):

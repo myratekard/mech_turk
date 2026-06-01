@@ -19,6 +19,9 @@ interface UploadFileState {
 
 // Max screenshots that can be queued at once.
 const MAX_FILES = 50;
+// Per-image size cap (keep in sync with backend MAX_UPLOAD_MB).
+const MAX_FILE_MB = 10;
+const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
 
 export default function Upload() {
   const [files, setFiles] = useState<UploadFileState[]>([]);
@@ -66,12 +69,22 @@ export default function Upload() {
 
   const processFiles = (newFiles: FileList | File[]) => {
     const incoming = Array.from(newFiles);
-    let validFiles = incoming.filter(f => f.type.startsWith('image/'));
+    const images = incoming.filter(f => f.type.startsWith('image/'));
 
-    if (validFiles.length !== incoming.length) {
+    if (images.length !== incoming.length) {
       toast({
         title: "Invalid file type",
         description: "Only image files are accepted.",
+        variant: "destructive"
+      });
+    }
+
+    // Reject anything over the per-image size cap.
+    let validFiles = images.filter(f => f.size <= MAX_FILE_BYTES);
+    if (validFiles.length !== images.length) {
+      toast({
+        title: "Image too large",
+        description: `Each image must be ${MAX_FILE_MB} MB or smaller; ${images.length - validFiles.length} skipped.`,
         variant: "destructive"
       });
     }
@@ -210,7 +223,7 @@ export default function Upload() {
               </div>
               <h3 className="text-xl font-bold mb-2">Drag & Drop Screenshots</h3>
               <p className="text-muted-foreground max-w-sm">
-                Drop your screenshots here or click to browse. Supported formats: JPG, PNG, WEBP. Up to {MAX_FILES} at a time.
+                Drop your screenshots here or click to browse. Supported formats: JPG, PNG, WEBP. Up to {MAX_FILES} at a time, max {MAX_FILE_MB} MB each.
               </p>
             </div>
 

@@ -97,6 +97,8 @@ export interface Invoice {
   createdAt: string;
   settledBy?: string | null;
   settledAt?: string | null;
+  receiptAmount?: number | null;
+  receiptImageUrl?: string | null;
 }
 export interface InvoiceLineItem {
   id: number;
@@ -108,8 +110,17 @@ export interface InvoiceLineItem {
   points: number;
   createdAt: string;
 }
+export interface InvoicePayee {
+  userId: string;
+  username?: string | null;
+  email?: string | null;
+  submissionCount: number;
+  points: number;
+  amount: number;
+}
 export interface InvoiceDetail extends Invoice {
   items: InvoiceLineItem[];
+  payees: InvoicePayee[];
 }
 export interface OutstandingSummary {
   orgId: string;
@@ -182,7 +193,11 @@ export const api = {
   generateInvoice: () => apiFetch<Invoice>("/api/admin/invoices", { method: "POST" }),
   listInvoices: () => apiFetch<Invoice[]>("/api/admin/invoices"),
   getInvoice: (id: number) => apiFetch<InvoiceDetail>(`/api/admin/invoices/${id}`),
-  settleInvoice: (id: number) => apiFetch<Invoice>(`/api/admin/invoices/${id}/settle`, { method: "POST" }),
+  settleInvoice: (id: number, objectPath: string) =>
+    apiFetch<Invoice>(`/api/admin/invoices/${id}/settle`, {
+      method: "POST",
+      body: JSON.stringify({ objectPath }),
+    }),
 };
 
 // Build a registration link from any referral/registration code.

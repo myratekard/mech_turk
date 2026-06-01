@@ -156,6 +156,22 @@ class VerificationResult(BaseModel):
     badge_bbox: Optional[List[float]] = None
 
 
+class ReceiptAnalysis(BaseModel):
+    """Bank/transfer receipt screenshot read — used to verify an invoice payment."""
+    is_receipt: bool = Field(
+        description="True if this image is a bank transfer / payment receipt or confirmation."
+    )
+    amount: Optional[float] = Field(
+        default=None,
+        description="The total amount PAID/transferred, as a plain number (no currency symbol or "
+                    "thousands separators). e.g. 12500.00. null if no amount is clearly visible.",
+    )
+    currency: Optional[str] = Field(
+        default=None, description="Currency symbol or code if shown (e.g. '₦', 'NGN', '$'); else null."
+    )
+    notes: Optional[str] = Field(default=None, description="Brief note on what was read.")
+
+
 class AnalysisResult(BaseModel):
     id: str
     created_at: str

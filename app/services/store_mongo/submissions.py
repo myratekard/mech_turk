@@ -102,9 +102,14 @@ def normalize_handle(handle: Optional[str]) -> Optional[str]:
 def is_duplicate_capture(
     acct_platform: Optional[str], acct_handle: Optional[str], exclude_id: Optional[int] = None
 ) -> bool:
+    """True if the same (platform, handle) has already been claimed by any user (accepted,
+    awaiting review, or already duplicate). invalid/unsupported don't count."""
     if not acct_platform or not acct_handle:
         return False
-    q: dict = {"status": "accepted", "acct_platform": acct_platform, "acct_handle": acct_handle}
+    q: dict = {
+        "status": {"$in": ["accepted", "in_review", "duplicate"]},
+        "acct_platform": acct_platform, "acct_handle": acct_handle,
+    }
     if exclude_id is not None:
         q["id"] = {"$ne": exclude_id}
     return _c().count_documents(q) > 0
@@ -331,13 +336,19 @@ def get_invoice(invoice_id: int) -> Optional[dict]:
     return inv
 
 
-def settle_invoice(invoice_id: int, settled_by) -> Tuple[Optional[dict], Optional[str]]:
+def settle_invoice(
+    invoice_id: int, settled_by, receipt_object_path: Optional[str] = None,
+    receipt_amount: Optional[float] = None,
+) -> Tuple[Optional[dict], Optional[str]]:
     ts = _now()
     inv = _inv().find_one({"id": invoice_id})
     if not inv:
         return None, "not_found"
     if inv.get("status") == "settled":
         return None, "already_settled"
-    _inv().update_one({"id": invoice_id}, {"$set": {"status": "settled", "settled_by": str(settled_by), "settled_at": ts}})
+    _inv().update_one({"id": invoice_id}, {"$set": {
+        "status": "settled", "settled_by": str(settled_by), "settled_at": ts,
+        "receipt_object_path": receipt_object_path, "receipt_amount": receipt_amount,
+    }})
     _c().update_many({"invoice_id": invoice_id}, {"$set": {"settled": 1, "settled_at": ts}})
     return _inv().find_one({"id": invoice_id}, {"_id": 0}), None

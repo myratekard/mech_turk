@@ -8,7 +8,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 
 from app.core.config import settings
-from app.schemas.models import VisionAnalysis
+from app.schemas.models import ReceiptAnalysis, VisionAnalysis
 
 try:
     from langsmith import traceable
@@ -78,6 +78,27 @@ def _structured_model():
     return model.with_structured_output(VisionAnalysis)
 
 
+@lru_cache(maxsize=1)
+def _receipt_model():
+    model = ChatGoogleGenerativeAI(
+        model=settings.gemini_model,
+        temperature=0,
+        google_api_key=settings.google_api_key or None,
+        thinking_budget=settings.gemini_thinking_budget,
+    )
+    return model.with_structured_output(ReceiptAnalysis)
+
+
+_RECEIPT_SYSTEM = (
+    "You read bank-transfer / payment receipt screenshots. Given ONE image, return a JSON object "
+    "matching the ReceiptAnalysis schema. Decide is_receipt (is this a payment/transfer receipt or "
+    "confirmation?). Extract `amount` = the TOTAL amount that was paid or transferred, as a plain "
+    "number with no currency symbol and no thousands separators (e.g. '₦12,500.00' -> 12500.00). "
+    "If several figures appear, choose the actual transfer/paid total (not a balance or fee). "
+    "Set amount to null if no amount is clearly visible. Record the currency symbol/code if shown."
+)
+
+
 def _data_uri(image_bytes: bytes, mime: str = "image/jpeg") -> str:
     b64 = base64.b64encode(image_bytes).decode("ascii")
     return f"data:{mime};base64,{b64}"
@@ -111,4 +132,27 @@ def analyze_screenshot(image_bytes: bytes, mime: str = "image/jpeg") -> VisionAn
             last_err = e
             if attempt < settings.llm_max_retries:
                 time.sleep(0.5 * (2 ** attempt))  # 0.5s, 1s, ...
+    raise last_err
+
+
+@traceable(run_type="llm", name="receipt-analyze")
+def extract_receipt_amount(image_bytes: bytes, mime: str = "image/jpeg") -> ReceiptAnalysis:
+    """Read a bank-receipt screenshot -> is_receipt + amount paid (for invoice settlement)."""
+    messages = [
+        SystemMessage(content=_RECEIPT_SYSTEM),
+        HumanMessage(
+            content=[
+                {"type": "text", "text": "Read this payment receipt. Return JSON only."},
+                {"type": "image_url", "image_url": {"url": _data_uri(image_bytes, mime)}},
+            ]
+        ),
+    ]
+    last_err = None
+    for attempt in range(settings.llm_max_retries + 1):
+        try:
+            return _receipt_model().invoke(messages)
+        except Exception as e:
+            last_err = e
+            if attempt < settings.llm_max_retries:
+                time.sleep(0.5 * (2 ** attempt))
     raise last_err

@@ -20,9 +20,11 @@ from app.schemas.auth_models import (
     InvoiceDetail,
     InvoiceLineItem,
     InvoiceOut,
+    InvoicePayee,
     OrgAnalytics,
     OrgOut,
     OutstandingSummary,
+    SettleInvoiceInput,
     ReviewItem,
     ReviewQueue,
     UserOut,
@@ -30,6 +32,7 @@ from app.schemas.auth_models import (
 )
 from app.services import auth_db, clerk_api, storage, submissions_db
 from app.services.pipeline import analyze as run_pipeline
+from app.services.vision_llm import extract_receipt_amount
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -333,24 +336,32 @@ def analytics_per_user(user: dict = Depends(_analytics_roles)):
 _invoice_roles = require_roles("admin", "superuser")
 
 
-def _inv_username(uid) -> str | None:
+def _inv_user(uid) -> dict | None:
     try:
-        u = auth_db.get_user_by_id(int(uid))
-        return u["username"] if u else None
+        return auth_db.get_user_by_id(int(uid))
     except (TypeError, ValueError):
         return None
+
+
+def _inv_username(uid) -> str | None:
+    u = _inv_user(uid)
+    return u["username"] if u else None
 
 
 def _to_invoice_out(inv: dict) -> InvoiceOut:
     pts = int(inv.get("total_points") or 0)
     rate = settings.invoice_point_rate
     org = auth_db.get_clerk_org(inv["org_id"])
+    receipt_path = inv.get("receipt_object_path")
+    # objectPath is like '/objects/<id>'; the object GET route keys on the bare id.
+    receipt_url = f"/api/storage/objects/{receipt_path.rstrip('/').split('/')[-1]}" if receipt_path else None
     return InvoiceOut(
         id=inv["id"], orgId=inv["org_id"], orgName=org["name"] if org else None,
         status=inv["status"], submissionCount=int(inv.get("submission_count") or 0),
         totalPoints=pts, rate=rate, amount=round(pts * rate, 2), currency=settings.invoice_currency,
         createdBy=_inv_username(inv.get("created_by")), createdAt=inv["created_at"],
         settledBy=_inv_username(inv.get("settled_by")), settledAt=inv.get("settled_at"),
+        receiptAmount=inv.get("receipt_amount"), receiptImageUrl=receipt_url,
     )
 
 
@@ -398,14 +409,64 @@ def get_invoice(invoice_id: int, user: dict = Depends(_invoice_roles)):
         )
         for it in inv.get("items", [])
     ]
-    return InvoiceDetail(**_to_invoice_out(inv).model_dump(), items=items)
+    # Per-user payment breakdown (who in the org gets paid, identified by email). Covers every
+    # uploader in the org on this invoice — referrals/downstream users AND staff who uploaded.
+    rate = settings.invoice_point_rate
+    agg: dict = {}
+    for it in inv.get("items", []):
+        uid = str(it["user_id"])
+        a = agg.setdefault(uid, {"count": 0, "points": 0})
+        a["count"] += 1
+        a["points"] += int(it["points"] or 0)
+    payees = []
+    for uid, a in agg.items():
+        u = _inv_user(uid)
+        payees.append(InvoicePayee(
+            userId=uid, username=u["username"] if u else None, email=u["email"] if u else None,
+            submissionCount=a["count"], points=a["points"], amount=round(a["points"] * rate, 2),
+        ))
+    payees.sort(key=lambda p: p.points, reverse=True)
+    return InvoiceDetail(**_to_invoice_out(inv).model_dump(), items=items, payees=payees)
 
 
 @router.post("/invoices/{invoice_id}/settle", response_model=InvoiceOut)
-def settle_invoice(invoice_id: int, user: dict = Depends(require_superuser)):
-    inv, err = submissions_db.settle_invoice(invoice_id, user["id"])
+def settle_invoice(invoice_id: int, body: SettleInvoiceInput, user: dict = Depends(require_superuser)):
+    # The superuser must attach a bank-receipt screenshot. We read the paid amount off it and
+    # only settle when it covers (>=) the invoice amount.
+    inv = submissions_db.get_invoice(invoice_id)
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invoice not found")
+    if inv["status"] == "settled":
+        raise HTTPException(status_code=409, detail="Invoice already settled")
+
+    invoice_amount = round(int(inv.get("total_points") or 0) * settings.invoice_point_rate, 2)
+
+    data = storage.read_object(body.objectPath)
+    if data is None:
+        raise HTTPException(status_code=400, detail="Receipt image not found — please re-upload.")
+    mime, _ = mimetypes.guess_type(body.objectPath)
+    try:
+        receipt = extract_receipt_amount(data, mime=mime or "image/jpeg")
+    except Exception:
+        raise HTTPException(status_code=502, detail="Couldn't read the receipt right now — please try again.")
+
+    if not receipt.is_receipt or receipt.amount is None:
+        raise HTTPException(
+            status_code=400,
+            detail="That doesn't look like a payment receipt, or no amount could be read from it.",
+        )
+    if round(float(receipt.amount), 2) < invoice_amount:
+        raise HTTPException(
+            status_code=400,
+            detail=(f"Receipt amount ({settings.invoice_currency}{receipt.amount:,.2f}) is less than "
+                    f"the invoice amount ({settings.invoice_currency}{invoice_amount:,.2f})."),
+        )
+
+    inv2, err = submissions_db.settle_invoice(
+        invoice_id, user["id"], receipt_object_path=body.objectPath, receipt_amount=float(receipt.amount),
+    )
     if err == "not_found":
         raise HTTPException(status_code=404, detail="Invoice not found")
     if err == "already_settled":
         raise HTTPException(status_code=409, detail="Invoice already settled")
-    return _to_invoice_out(inv)
+    return _to_invoice_out(inv2)

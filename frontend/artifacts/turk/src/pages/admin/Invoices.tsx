@@ -2,12 +2,13 @@ import { useEffect, useState } from "react";
 import { Shell } from "@/components/layout/Shell";
 import { api, Invoice, InvoiceDetail, OutstandingSummary } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { useUpload } from "@workspace/object-storage-web";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { format } from "date-fns";
-import { Receipt, FilePlus2, CheckCircle2 } from "lucide-react";
+import { Receipt, FilePlus2, CheckCircle2, ExternalLink } from "lucide-react";
 
 const money = (amt: number, cur: string) =>
   `${cur} ${amt.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -25,6 +26,8 @@ export default function Invoices() {
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState<InvoiceDetail | null>(null);
   const [open, setOpen] = useState(false);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const { uploadFile } = useUpload();
 
   const load = () => {
     api.listInvoices().then(setInvoices).catch(() => {});
@@ -48,6 +51,7 @@ export default function Invoices() {
   const openDetail = async (id: number) => {
     setOpen(true);
     setDetail(null);
+    setReceiptFile(null);
     try {
       setDetail(await api.getInvoice(id));
     } catch (e: any) {
@@ -56,14 +60,22 @@ export default function Invoices() {
   };
 
   const settle = async (id: number) => {
+    if (!receiptFile) {
+      toast({ title: "Receipt required", description: "Attach the bank receipt screenshot first.", variant: "destructive" });
+      return;
+    }
     setBusy(true);
     try {
-      await api.settleInvoice(id);
-      toast({ title: "Invoice settled" });
+      // Upload the receipt, then settle — the backend reads the amount and only settles if it covers the invoice.
+      const up = await uploadFile(receiptFile);
+      if (!up) throw new Error("Receipt upload failed");
+      await api.settleInvoice(id, up.objectPath);
+      toast({ title: "Invoice settled", description: "Receipt verified." });
       setOpen(false);
+      setReceiptFile(null);
       load();
     } catch (e: any) {
-      toast({ title: "Failed", description: e?.message, variant: "destructive" });
+      toast({ title: "Couldn't settle", description: e?.message, variant: "destructive" });
     } finally {
       setBusy(false);
     }
@@ -157,6 +169,42 @@ export default function Invoices() {
                   </div>
                 </div>
 
+                {/* Per-user payment breakdown — who gets paid, by email. */}
+                {detail.payees && detail.payees.length > 0 && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                      Payment by user
+                    </p>
+                    <div className="border border-border rounded-lg overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
+                          <tr>
+                            <th className="text-left p-2">User</th>
+                            <th className="text-left p-2">Email</th>
+                            <th className="text-right p-2">Subs</th>
+                            <th className="text-right p-2">Pts</th>
+                            <th className="text-right p-2">Amount</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/50">
+                          {detail.payees.map((p) => (
+                            <tr key={p.userId}>
+                              <td className="p-2 truncate max-w-[120px]">{p.username || p.userId}</td>
+                              <td className="p-2 font-mono text-xs truncate max-w-[180px]">{p.email || "—"}</td>
+                              <td className="p-2 text-right font-mono">{p.submissionCount}</td>
+                              <td className="p-2 text-right font-mono">{p.points}</td>
+                              <td className="p-2 text-right font-mono font-bold text-primary">{money(p.amount, detail.currency)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-2">
+                  All submissions
+                </p>
                 <div className="border border-border rounded-lg overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-muted/30 text-xs uppercase tracking-wider text-muted-foreground">
@@ -185,16 +233,45 @@ export default function Invoices() {
                 </div>
 
                 {isSuperuser && detail.status === "pending" && (
-                  <Button disabled={busy} onClick={() => settle(detail.id)} className="w-full gap-2 bg-green-600 hover:bg-green-600/90 text-white font-bold uppercase tracking-wide">
-                    <CheckCircle2 size={16} /> Settle invoice
-                  </Button>
+                  <div className="space-y-3 border-t border-border pt-4">
+                    <div>
+                      <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">
+                        Bank receipt <span className="text-destructive">*</span>
+                      </p>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setReceiptFile(e.target.files?.[0] ?? null)}
+                        className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-border file:bg-muted file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-foreground hover:file:bg-muted/70"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1.5">
+                        We read the amount on the receipt and only settle if it's at least{" "}
+                        <b className="text-foreground">{money(detail.amount, detail.currency)}</b>.
+                      </p>
+                    </div>
+                    <Button disabled={busy || !receiptFile} onClick={() => settle(detail.id)} className="w-full gap-2 bg-green-600 hover:bg-green-600/90 text-white font-bold uppercase tracking-wide">
+                      <CheckCircle2 size={16} /> {busy ? "Verifying receipt…" : "Verify receipt & settle"}
+                    </Button>
+                  </div>
                 )}
                 {detail.status === "settled" && (
-                  <p className="text-sm text-green-500 flex items-center gap-2">
-                    <CheckCircle2 size={16} /> Settled
-                    {detail.settledAt ? ` on ${format(new Date(detail.settledAt), "MMM d, yyyy")}` : ""}
-                    {detail.settledBy ? ` by ${detail.settledBy}` : ""}.
-                  </p>
+                  <div className="border-t border-border pt-4 space-y-1.5">
+                    <p className="text-sm text-green-500 flex items-center gap-2">
+                      <CheckCircle2 size={16} /> Settled
+                      {detail.settledAt ? ` on ${format(new Date(detail.settledAt), "MMM d, yyyy")}` : ""}
+                      {detail.settledBy ? ` by ${detail.settledBy}` : ""}.
+                    </p>
+                    {detail.receiptAmount != null && (
+                      <p className="text-sm text-muted-foreground">
+                        Receipt amount: <b className="text-foreground">{money(detail.receiptAmount, detail.currency)}</b>
+                      </p>
+                    )}
+                    {detail.receiptImageUrl && (
+                      <a href={detail.receiptImageUrl} target="_blank" rel="noreferrer" className="text-sm text-primary font-semibold inline-flex items-center gap-1 hover:underline">
+                        <ExternalLink size={13} /> View receipt
+                      </a>
+                    )}
+                  </div>
                 )}
               </div>
             )}
