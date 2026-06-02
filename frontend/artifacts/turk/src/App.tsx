@@ -31,6 +31,19 @@ const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string;
 if (!clerkPubKey) throw new Error("Missing VITE_CLERK_PUBLISHABLE_KEY in artifacts/turk/.env");
 
+// Capture an org referral/registration code as EARLY as possible — at module load,
+// before Clerk can route a user with an existing Google account to sign-IN (where the
+// /register ref-capture effect never runs). Persisted so the post-auth clerk_sync can
+// attribute the account no matter which auth screen Clerk shows; cleared on successful
+// sync (see lib/auth.tsx). This is the fix for "you can only sign in with an organization"
+// hitting users who already had a Google/Clerk account.
+try {
+  const refFromUrl = new URLSearchParams(window.location.search).get("ref");
+  if (refFromUrl) localStorage.setItem("turk_ref", refFromUrl);
+} catch {
+  /* localStorage unavailable — ignore */
+}
+
 // Clerk sign-in/up theming — matches the Turk dashboard (dark + cyan), per the Replit design.
 const clerkAppearance = {
   theme: shadcn,

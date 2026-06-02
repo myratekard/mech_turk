@@ -29,7 +29,7 @@ export default function Register() {
           {" "}as <span className="uppercase text-primary font-bold">{info.role}</span>
         </p>
       )}
-      <SignUp routing="hash" signInUrl="/login" forceRedirectUrl="/dashboard" />
+      <SignUp routing="hash" signInUrl={ref ? `/login?ref=${encodeURIComponent(ref)}` : "/login"} forceRedirectUrl="/dashboard" />
     </div>
   );
 }
