@@ -1,19 +1,67 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Shell } from "@/components/layout/Shell";
 import { useUpload } from "@workspace/object-storage-web";
 import { useCreateSubmission, getListSubmissionsQueryKey, getGetDashboardSummaryQueryKey, getGetRecentSubmissionsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { UploadCloud, CheckCircle2, AlertCircle, FileImage, X } from "lucide-react";
+import { UploadCloud, CheckCircle2, AlertCircle, FileImage, X, Clock, Copy, XCircle, ImageOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 
+// Per-upload verdict returned by the backend, with its display treatment.
+type Verdict = "accepted" | "in_review" | "duplicate" | "invalid" | "unsupported";
+
+const VERDICT: Record<Verdict, { label: string; Icon: any; text: string; ring: string }> = {
+  accepted:    { label: "Accepted",    Icon: CheckCircle2, text: "text-green-500",   ring: "border-green-500/50 shadow-[0_0_22px_rgba(34,197,94,0.30)]" },
+  in_review:   { label: "In review",   Icon: Clock,        text: "text-amber-500",   ring: "border-amber-500/50 shadow-[0_0_22px_rgba(245,158,11,0.30)]" },
+  duplicate:   { label: "Duplicate",   Icon: Copy,         text: "text-fuchsia-500", ring: "border-fuchsia-500/50 shadow-[0_0_22px_rgba(217,70,239,0.30)]" },
+  invalid:     { label: "Invalid",     Icon: XCircle,      text: "text-red-500",     ring: "border-red-500/50 shadow-[0_0_22px_rgba(239,68,68,0.30)]" },
+  unsupported: { label: "Unsupported", Icon: ImageOff,     text: "text-slate-400",   ring: "border-slate-500/50 shadow-[0_0_22px_rgba(100,116,139,0.30)]" },
+};
+
+const CONFETTI_COLORS = ["#22c55e", "#06b6d4", "#a855f7", "#f59e0b", "#ec4899", "#ffffff"];
+
+// Lightweight, dependency-free confetti — particles burst from center via the Web
+// Animations API. Mounted only for accepted uploads, capped count, ~1s self-cleaning.
+function ConfettiBurst({ count = 16 }: { count?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const root = ref.current;
+    if (!root) return;
+    (Array.from(root.children) as HTMLElement[]).forEach((p) => {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 36 + Math.random() * 64;
+      const dx = Math.cos(angle) * dist;
+      const dy = Math.sin(angle) * dist - 16; // slight upward bias
+      const rot = Math.random() * 720 - 360;
+      const dur = 650 + Math.random() * 500;
+      p.animate(
+        [
+          { transform: "translate(0,0) rotate(0) scale(1)", opacity: 1 },
+          { transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(0.6)`, opacity: 0 },
+        ],
+        { duration: dur, easing: "cubic-bezier(.15,.7,.3,1)", fill: "forwards" },
+      );
+    });
+  }, []);
+  return (
+    <div ref={ref} aria-hidden className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center overflow-visible">
+      {Array.from({ length: count }).map((_, i) => (
+        <span key={i} className="absolute h-1.5 w-1.5 rounded-[1px]" style={{ background: CONFETTI_COLORS[i % CONFETTI_COLORS.length] }} />
+      ))}
+    </div>
+  );
+}
+
 interface UploadFileState {
   id: string;
   file: File;
   progress: number;
-  status: "pending" | "uploading" | "processing" | "success" | "error";
+  status: "pending" | "uploading" | "processing" | "done" | "error";
+  verdict?: Verdict;
+  points?: number;
+  leaving?: boolean;
   error?: string;
 }
 
@@ -131,9 +179,6 @@ export default function Upload() {
 
     if (pendingFiles.length === 0) return;
 
-    let existsCount = 0;   // regular duplicate — account already captured
-    let imageCount = 0;    // self duplicate — same image re-uploaded
-
     for (const fileState of pendingFiles) {
       // Update status to uploading
       setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "uploading", progress: 10 } : f));
@@ -166,37 +211,25 @@ export default function Upload() {
         });
         clearInterval(progressInterval);
 
-        if (created?.status === "duplicate") {
-          if (created?.dupKind === "self") imageCount++;
-          else existsCount++;
-        }
-
-        // Update to success, then clear the bar from the queue shortly after so
-        // only pending/failed items remain visible.
-        setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "success", progress: 100 } : f));
-        setTimeout(() => removeFile(fileState.id), 1200);
+        // Surface the actual verdict (accepted / in_review / duplicate / invalid /
+        // unsupported) on the row, then pulse it out: hold ~2.4s so the user sees
+        // the result + confetti for accepts, then fade + collapse the row away.
+        const verdict = ((created?.status as Verdict) ?? "accepted");
+        setFiles(prev => prev.map(f => f.id === fileState.id
+          ? { ...f, status: "done", progress: 100, verdict, points: created?.points }
+          : f));
+        setTimeout(() => {
+          setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, leaving: true } : f));
+          setTimeout(() => removeFile(fileState.id), 360);
+        }, 2400);
       } catch (err) {
         // Update to error
         setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "error", error: "Upload failed" } : f));
       }
     }
     
-    // One toast covering both duplicate kinds (account already exists / same image re-uploaded).
-    if (existsCount || imageCount) {
-      const parts: string[] = [];
-      if (existsCount) parts.push(`${existsCount} already exist${existsCount > 1 ? "" : "s"} (account already captured)`);
-      if (imageCount) parts.push(`${imageCount} duplicate image${imageCount > 1 ? "s" : ""} (already uploaded)`);
-      toast({
-        title: "Some uploads were duplicates",
-        description: `${parts.join(" · ")} — duplicates don't earn points.`,
-        variant: "destructive",
-      });
-    } else {
-      toast({
-        title: "Operation Complete",
-        description: "Finished processing uploads.",
-      });
-    }
+    // No toasts — confetti + the per-row verdict (incl. fuchsia "Duplicate" rows)
+    // already convey the outcome.
   };
 
   const pendingCount = files.filter(f => f.status === "pending" || f.status === "error").length;
@@ -259,12 +292,23 @@ export default function Upload() {
                 </div>
 
                 <div className="space-y-3">
-                  {files.map((file) => (
-                    <div key={file.id} className="bg-card border border-border rounded-lg p-4 flex items-center gap-4">
+                  {files.map((file) => {
+                    const v = file.status === "done" && file.verdict ? VERDICT[file.verdict] : undefined;
+                    const showConfetti = file.status === "done" && file.verdict === "accepted" && !file.leaving;
+                    return (
+                    <div
+                      key={file.id}
+                      className={cn(
+                        "relative bg-card border rounded-lg p-4 flex items-center gap-4 transition-all duration-300",
+                        v ? v.ring : "border-border",
+                        file.leaving ? "opacity-0 scale-95" : "opacity-100",
+                      )}
+                    >
+                      {showConfetti && <ConfettiBurst />}
                       <div className="w-12 h-12 rounded bg-muted flex items-center justify-center shrink-0">
                         <FileImage size={24} className="text-muted-foreground" />
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex justify-between items-center mb-1">
                           <h4 className="font-semibold text-sm truncate pr-4">{file.file.name}</h4>
@@ -272,29 +316,33 @@ export default function Upload() {
                             {(file.file.size / 1024 / 1024).toFixed(2)} MB
                           </span>
                         </div>
-                        
+
                         <div className="flex items-center gap-3">
                           <div className="flex-1">
                             <Progress value={file.progress} className="h-1.5" />
                           </div>
-                          <span className="text-xs font-bold uppercase w-16 text-right">
+                          <span className="text-[10px] font-bold uppercase leading-tight w-24 text-right whitespace-nowrap">
                             {file.status === "pending" && <span className="text-muted-foreground">Ready</span>}
                             {file.status === "uploading" && <span className="text-primary animate-pulse">Up...</span>}
-                            {file.status === "success" && <span className="text-green-500">Done</span>}
+                            {v && (
+                              <span className={v.text}>
+                                {file.verdict === "accepted" && file.points ? `+${file.points} pts` : v.label}
+                              </span>
+                            )}
                             {file.status === "error" && <span className="text-destructive">Err</span>}
                           </span>
                         </div>
                       </div>
 
                       <div className="shrink-0 pl-2">
-                        {file.status === "success" ? (
-                          <CheckCircle2 size={20} className="text-green-500" />
+                        {v ? (
+                          <v.Icon size={20} className={v.text} />
                         ) : file.status === "error" ? (
                           <AlertCircle size={20} className="text-destructive" />
                         ) : (
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             className="h-8 w-8 text-muted-foreground hover:text-destructive"
                             onClick={() => removeFile(file.id)}
                             disabled={isUploading && file.status !== "pending"}
@@ -304,7 +352,8 @@ export default function Upload() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}
