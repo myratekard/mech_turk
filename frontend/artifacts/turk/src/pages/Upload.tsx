@@ -20,36 +20,80 @@ const VERDICT: Record<Verdict, { label: string; Icon: any; text: string; ring: s
   unsupported: { label: "Unsupported", Icon: ImageOff,     text: "text-slate-400",   ring: "border-slate-500/50 shadow-[0_0_22px_rgba(100,116,139,0.30)]" },
 };
 
-const CONFETTI_COLORS = ["#22c55e", "#06b6d4", "#a855f7", "#f59e0b", "#ec4899", "#ffffff"];
+const CONFETTI_COLORS = [
+  "#22c55e", "#16a34a", "#4ade80", "#06b6d4", "#22d3ee", "#a855f7",
+  "#d946ef", "#f59e0b", "#fbbf24", "#ec4899", "#f43f5e", "#ffffff",
+];
+const CONFETTI_SIZES = [5, 6, 7, 8, 9, 10];
 
-// Lightweight, dependency-free confetti — particles burst from center via the Web
-// Animations API. Mounted only for accepted uploads, capped count, ~1s self-cleaning.
-function ConfettiBurst({ count = 16 }: { count?: number }) {
+// Lightweight, dependency-free confetti — a full fountain burst (upward fan + gravity
+// fall) of varied colours, sizes and shapes, via the Web Animations API. Mounted only
+// for accepted uploads; self-cleaning (~1.7s). Particles overflow the row frame.
+function ConfettiBurst({ count = 48 }: { count?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
     (Array.from(root.children) as HTMLElement[]).forEach((p) => {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 36 + Math.random() * 64;
-      const dx = Math.cos(angle) * dist;
-      const dy = Math.sin(angle) * dist - 16; // slight upward bias
-      const rot = Math.random() * 720 - 360;
-      const dur = 650 + Math.random() * 500;
+      // Fan mostly upward for a fountain, then let "gravity" pull each piece back down.
+      const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.3;
+      const power = 70 + Math.random() * 150;
+      const dx = Math.cos(angle) * power;
+      const dyUp = Math.sin(angle) * power;          // negative = upward
+      const fall = 140 + Math.random() * 200;        // gravity drop on the way out
+      const rot = Math.random() * 1200 - 600;
+      const dur = 950 + Math.random() * 800;
       p.animate(
         [
-          { transform: "translate(0,0) rotate(0) scale(1)", opacity: 1 },
-          { transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(0.6)`, opacity: 0 },
+          { transform: "translate(0,0) rotate(0deg) scale(1)", opacity: 1, offset: 0 },
+          { transform: `translate(${dx * 0.6}px, ${dyUp}px) rotate(${rot * 0.5}deg) scale(1)`, opacity: 1, offset: 0.35 },
+          { transform: `translate(${dx}px, ${dyUp + fall}px) rotate(${rot}deg) scale(0.6)`, opacity: 0, offset: 1 },
         ],
-        { duration: dur, easing: "cubic-bezier(.15,.7,.3,1)", fill: "forwards" },
+        { duration: dur, easing: "cubic-bezier(.15,.6,.3,1)", fill: "forwards" },
       );
     });
   }, []);
   return (
     <div ref={ref} aria-hidden className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center overflow-visible">
-      {Array.from({ length: count }).map((_, i) => (
-        <span key={i} className="absolute h-1.5 w-1.5 rounded-[1px]" style={{ background: CONFETTI_COLORS[i % CONFETTI_COLORS.length] }} />
-      ))}
+      {Array.from({ length: count }).map((_, i) => {
+        const size = CONFETTI_SIZES[i % CONFETTI_SIZES.length];
+        return (
+          <span
+            key={i}
+            className={`absolute ${i % 3 === 0 ? "rounded-full" : "rounded-[1px]"}`}
+            style={{ width: size, height: i % 4 === 0 ? size * 1.8 : size, background: CONFETTI_COLORS[i % CONFETTI_COLORS.length] }}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+// Celebratory "+N" that pops out of the row, bounces (scale overshoot) and keeps
+// growing as it flies up and out of frame — paired with the confetti on an accept.
+function PointsPop({ label }: { label: string }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.animate(
+      [
+        { transform: "translate(-50%,-50%) translateY(0) scale(0.3)", opacity: 0, offset: 0 },
+        { transform: "translate(-50%,-50%) translateY(-8px) scale(1.5)", opacity: 1, offset: 0.28 },   // pop + overshoot
+        { transform: "translate(-50%,-50%) translateY(-16px) scale(1.15)", opacity: 1, offset: 0.46 }, // bounce settle
+        { transform: "translate(-50%,-50%) translateY(-82px) scale(2.5)", opacity: 0, offset: 1 },      // grow + fly out of frame
+      ],
+      { duration: 1400, easing: "cubic-bezier(.2,.8,.25,1)", fill: "forwards" },
+    );
+  }, []);
+  return (
+    <div
+      ref={ref}
+      aria-hidden
+      className="pointer-events-none absolute left-1/2 top-1/2 z-30 font-black tracking-tight text-green-400 drop-shadow-[0_0_12px_rgba(34,197,94,0.85)]"
+      style={{ fontSize: 30 }}
+    >
+      {label}
     </div>
   );
 }
@@ -305,6 +349,7 @@ export default function Upload() {
                       )}
                     >
                       {showConfetti && <ConfettiBurst />}
+                      {showConfetti && file.points ? <PointsPop label={`+${file.points}`} /> : null}
                       <div className="w-12 h-12 rounded bg-muted flex items-center justify-center shrink-0">
                         <FileImage size={24} className="text-muted-foreground" />
                       </div>
