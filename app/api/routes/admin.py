@@ -13,7 +13,7 @@ from pydantic import BaseModel
 
 from app.api.deps import get_current_user, require_roles, require_superuser
 from app.api.routes.auth import to_user_out
-from app.api.routes.turk import map_status_points, platform_label, regular_duplicate_points
+from app.api.routes.turk import map_status_points, platform_label, apply_african_gate, regular_duplicate_points
 from app.core.config import settings
 from app.schemas.auth_models import (
     CreateOrgInput,
@@ -62,6 +62,9 @@ def _row_to_review_item(row: dict) -> ReviewItem:
         needsReview=ver.get("needs_review"), profile=a.get("profile"),
         reasoning=(ver.get("llm_signal") or {}).get("reasoning"),
         africanDescent=a.get("appears_african_descent"),
+        africanClass=a.get("african_classification"),
+        africanConf=a.get("african_confidence"),
+        accountType=a.get("account_type"),
     )
 
 
@@ -147,6 +150,7 @@ def rerun(submission_id: int, user: dict = Depends(_reviewer)):
     except Exception:
         raise HTTPException(status_code=502, detail="Analysis is unavailable right now — please try again.")
     status, points = map_status_points(result)
+    status, points = apply_african_gate(result, status, points)  # African eligibility gate
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
     dup_kind = None

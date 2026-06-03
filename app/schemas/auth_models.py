@@ -163,7 +163,10 @@ class ReviewItem(BaseModel):
     needsReview: Optional[bool] = None
     profile: Optional[Any] = None
     reasoning: Optional[str] = None
-    africanDescent: Optional[bool] = None   # informational only
+    africanDescent: Optional[bool] = None   # informational only (derived bool)
+    africanClass: Optional[str] = None      # african | non_african | generic | unclear
+    africanConf: Optional[float] = None     # model confidence in the African call
+    accountType: Optional[str] = None       # individual | organization | government | unknown
 
 
 class ReviewQueue(BaseModel):

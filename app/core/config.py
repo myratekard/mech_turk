@@ -59,6 +59,13 @@ class Settings:
     invoice_currency: str = os.getenv("INVOICE_CURRENCY", "USD")
 
     points_accepted: int = int(os.getenv("POINTS_ACCEPTED", "50"))            # new verified capture
+    # African eligibility gate (informational classifier becomes a deciding factor):
+    #   verified + african  (conf >= min)     -> accepted
+    #   verified + non_african (conf >= min)   -> invalid (ineligible; disputable)
+    #   verified + generic/unclear/low-conf    -> in_review (human decides)
+    # Tuned on the labeled set: 0.7 yields ~10% review, 0 false-accepts (see verify/classification).
+    african_gate_enabled: bool = os.getenv("AFRICAN_GATE_ENABLED", "true").lower() == "true"
+    african_conf_min: float = float(os.getenv("AFRICAN_CONF_MIN", "0.7"))
     points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "-2"))          # regular duplicate, first tier (penalty)
     points_self_duplicate: int = int(os.getenv("POINTS_SELF_DUPLICATE", "-10"))  # self re-upload, final tier (penalty)
     # After a user racks up this many regular duplicates, the penalty escalates (to -5).

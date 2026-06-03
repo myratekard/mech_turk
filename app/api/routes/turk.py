@@ -51,6 +51,25 @@ def map_status_points(result) -> tuple[str, int]:
     return "invalid", 0
 
 
+def apply_african_gate(result, status: str, points: int) -> tuple[str, int]:
+    """African is a deciding factor: only gate a would-be ACCEPT (verified) submission.
+
+      african     (conf >= min) -> stays accepted (eligible)
+      non_african (conf >= min) -> invalid (ineligible — disputable)
+      generic / unclear / low-confidence -> in_review (human decides; low-conf routes here)
+    Other statuses (unsupported / invalid / already in_review) are left untouched.
+    """
+    if status != "accepted" or not settings.african_gate_enabled:
+        return status, points
+    cls = result.african_classification
+    conf = result.african_confidence or 0.0
+    if cls == "african" and conf >= settings.african_conf_min:
+        return "accepted", points
+    if cls == "non_african" and conf >= settings.african_conf_min:
+        return "invalid", 0
+    return "in_review", 0
+
+
 def platform_label(result) -> str:
     return _PLATFORM_LABEL.get(result.platform, "Unknown")
 
@@ -136,6 +155,17 @@ def _org_name(org_id) -> Optional[str]:
     return _ORG_NAME_CACHE[org_id]
 
 
+def _african_descent(row: dict):
+    """The LLM's informational guess, stored as a top-level key in analysis_json."""
+    aj = row.get("analysis_json")
+    if not aj:
+        return None
+    try:
+        return json.loads(aj).get("appears_african_descent")
+    except Exception:
+        return None
+
+
 def _row_to_submission(row: dict) -> Submission:
     settled = bool(row.get("settled") or 0)
     return Submission(
@@ -152,6 +182,10 @@ def _row_to_submission(row: dict) -> Submission:
         settled=settled,
         settledAt=row.get("settled_at"),
         settledVia=_org_name(row.get("org_id")) if settled else None,
+        africanDescent=_african_descent(row),
+        acctHandle=row.get("acct_handle"),
+        orgId=str(row["org_id"]) if row.get("org_id") else None,
+        orgName=_org_name(row.get("org_id")),
         createdAt=row["created_at"],
         updatedAt=row["updated_at"],
     )
@@ -227,6 +261,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
         return _row_to_submission(row)
 
     status, points = map_status_points(result)
+    status, points = apply_african_gate(result, status, points)  # African eligibility gate
     platform = body.platform or platform_label(result)
 
     # Account-level duplicate (same platform+handle already captured) earns no points.

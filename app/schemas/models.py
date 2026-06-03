@@ -6,6 +6,9 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel, Field
 
 Platform = Literal["instagram", "x", "tiktok", "unknown"]
+# Informational-only analytics (never affects acceptance/points — all accepts score the same).
+AccountType = Literal["individual", "organization", "government", "unknown"]
+AfricanClass = Literal["african", "non_african", "generic", "unclear"]
 
 
 # ----------------------------------------------------------------------------
@@ -115,15 +118,29 @@ class VisionAnalysis(BaseModel):
         None, description="Short justification for the verification verdict"
     )
 
-    # INFORMATIONAL ONLY — never used to accept/reject. Best-effort read of whether the
-    # account holder appears to be of African descent (the platform's focus audience).
-    appears_african_descent: Optional[bool] = Field(
+    # INFORMATIONAL ONLY — never used to accept/reject (all accepts score the same).
+    account_type: Optional[AccountType] = Field(
         default=None,
         description=(
-            "Best-effort, informational guess: does the profile owner appear to be of African "
-            "descent (from the profile photo, name, bio, content)? null if unclear. This does "
-            "NOT affect verification or acceptance."
+            "What kind of account this is: 'individual' (a person), 'organization' (a brand / "
+            "company / media outlet), 'government' (official state/govt body), or 'unknown'."
         ),
+    )
+    african_classification: Optional[AfricanClass] = Field(
+        default=None,
+        description=(
+            "Is this account African? Judge from the display name, @handle, bio, links and content "
+            "— for ANY account_type (a person of African descent, or an African brand/org/govt body, "
+            "e.g. African country, African language/slang, .ng/.za etc., African city). Values: "
+            "'african'; 'non_african' (clearly non-African, e.g. US/UK/Asia brand or person); "
+            "'generic' (the identifying text is a culturally-neutral/common name or generic brand "
+            "like 'angel', 'official', 'thebest' — gives no origin signal); 'unclear' (too little "
+            "info to judge at all)."
+        ),
+    )
+    african_confidence: Optional[float] = Field(
+        default=None, ge=0.0, le=1.0,
+        description="Your calibrated confidence in [0,1] for african_classification (low when generic/unclear).",
     )
 
     profile: VisionProfile = Field(default_factory=VisionProfile)
@@ -178,7 +195,12 @@ class AnalysisResult(BaseModel):
     platform: Platform
     platform_confidence: float
     is_profile_screenshot: bool = True
-    appears_african_descent: Optional[bool] = None   # informational only
+    # Informational-only analytics (never affects acceptance/points).
+    account_type: Optional[AccountType] = None
+    african_classification: Optional[AfricanClass] = None
+    african_confidence: Optional[float] = None
+    # Back-compat bool derived from african_classification (african->True, non_african->False, else None).
+    appears_african_descent: Optional[bool] = None
     verification: VerificationResult
     profile: Optional[ProfileArtifact] = None  # populated only when verified
     source_image_ref: Optional[str] = None

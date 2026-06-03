@@ -32,6 +32,11 @@ class Submission(BaseModel):
     settled: bool = False
     settledAt: Optional[str] = None
     settledVia: Optional[str] = None   # org name the settlement came through
+    africanDescent: Optional[bool] = None  # informational LLM guess (null = unclear/unknown)
+    acctHandle: Optional[str] = None       # social handle captured from the screenshot
+    orgId: Optional[str] = None            # uploader's org at submission time
+    orgName: Optional[str] = None
+    username: Optional[str] = None         # uploader (populated in admin listing)
     createdAt: str
     updatedAt: str
 
