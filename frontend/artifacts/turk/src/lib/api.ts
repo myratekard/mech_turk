@@ -147,6 +147,9 @@ export interface ReviewItem {
   profile?: any;
   reasoning?: string;
   africanDescent?: boolean | null;
+  africanClass?: "african" | "non_african" | "generic" | "unclear" | null;
+  africanConf?: number | null;
+  accountType?: "individual" | "organization" | "government" | "unknown" | null;
 }
 
 // ---- auth (Clerk-backed; login/signup happen in Clerk UI) ----

@@ -131,9 +131,19 @@ export default function ReviewQueue() {
                     <span>{it.confidence != null ? `${Math.round(it.confidence * 100)}%` : "—"}</span>
                     <span className="text-muted-foreground">Handle</span>
                     <span className="truncate">{it.profile?.handle || "—"}</span>
-                    <span className="text-muted-foreground">African descent</span>
-                    <span title="Informational only — does not affect acceptance">
-                      {it.africanDescent == null ? "Unclear" : it.africanDescent ? "Likely" : "Unlikely"}
+                    <span className="text-muted-foreground">Account type</span>
+                    <span className="capitalize">{it.accountType || "—"}</span>
+                    <span className="text-muted-foreground">African</span>
+                    <span
+                      title="Deciding factor — low confidence is why this is in review"
+                      className={
+                        it.africanClass === "african" ? "text-green-500"
+                        : it.africanClass === "non_african" ? "text-red-500"
+                        : "text-muted-foreground"
+                      }
+                    >
+                      {(it.africanClass || "unclear").replace("_", "-")}
+                      {it.africanConf != null ? ` · ${Math.round(it.africanConf * 100)}%` : ""}
                     </span>
                   </div>
                   {it.reasoning && (
