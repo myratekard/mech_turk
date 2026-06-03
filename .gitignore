@@ -23,3 +23,14 @@ frontend/**/node_modules/
 frontend/**/dist/
 frontend/**/.vite/
 frontend/.pnpm-store/
+
+# Local African-classification analysis artifacts (contain user images / handles / hardcoded creds — do NOT commit)
+/african_descent_accuracy.html
+/sample_classification.html
+/label.html
+/verify/classification/r2_cache/
+/verify/classification/groundtruth*.json
+/verify/classification/samples/_results.json
+tools/build_groundtruth.py
+tools/classify_samples.py
+tools/make_label_page.py
