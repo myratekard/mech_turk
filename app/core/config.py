@@ -71,7 +71,11 @@ class Settings:
 
     # --- Abuse / cost controls ---
     daily_upload_limit: int = int(os.getenv("DAILY_UPLOAD_LIMIT", "200"))  # per user / 24h
-    phash_distance: int = int(os.getenv("PHASH_DISTANCE", "5"))            # near-dup bit threshold
+    phash_distance: int = int(os.getenv("PHASH_DISTANCE", "5"))            # legacy 64-bit avg-hash threshold
+    # 256-bit dHash near-EXACT threshold: only a true re-upload of the same screenshot
+    # short-circuits as a duplicate. Looser look-alikes fall through to the LLM, and the
+    # account-level handle check decides — so two different profiles can't be collapsed.
+    dhash_distance: int = int(os.getenv("DHASH_DISTANCE", "12"))
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "10"))             # per-image size cap
 
     # Public base URL of the frontend, used to build registration links in emails.

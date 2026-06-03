@@ -25,7 +25,7 @@ from app.schemas.api_models import (
     UploadUrlResponse,
 )
 from app.services import image_gate, storage, submissions_db
-from app.services.imagehash import average_hash
+from app.services.imagehash import dhash
 from app.services.pipeline import analyze as run_pipeline
 
 router = APIRouter()
@@ -184,13 +184,15 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
         )
         return _row_to_submission(row)
 
-    # 2) Perceptual-hash pre-check: a re-uploaded / near-identical image skips the LLM
-    #    entirely (no token spend). Re-uploading your own image is penalized.
+    # 2) Image-hash pre-check: ONLY a near-EXACT re-upload of the same screenshot
+    #    short-circuits the LLM here (256-bit dHash, tight threshold). Look-alike
+    #    screenshots of DIFFERENT accounts no longer match — they fall through to the
+    #    engine below, where the account-level handle check is the authority on dupes.
     try:
-        img_hash = average_hash(data)
+        img_hash = dhash(data)
     except Exception:
         img_hash = None
-    match = submissions_db.find_phash_match(img_hash, settings.phash_distance) if img_hash else None
+    match = submissions_db.find_phash_match(img_hash, settings.dhash_distance) if img_hash else None
     if match:
         # Self-duplicate = the same user re-uploading the same image; others' re-upload = duplicate.
         same_user = match["user_id"] == uid
