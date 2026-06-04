@@ -69,6 +69,10 @@ def init_db() -> None:
             conn.execute("ALTER TABLE submissions ADD COLUMN settled_at TEXT")
         if "dup_kind" not in cols:
             conn.execute("ALTER TABLE submissions ADD COLUMN dup_kind TEXT")  # 'self' | 'regular' | null
+        if "content_hash" not in cols:
+            conn.execute("ALTER TABLE submissions ADD COLUMN content_hash TEXT")  # sha256 of raw bytes
+        # Indexed exact-content lookup → O(1) detection of true re-uploads (no Hamming scan).
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sub_content_hash ON submissions(content_hash)")
         conn.execute(
             """
             CREATE TABLE IF NOT EXISTS invoices (
@@ -107,6 +111,7 @@ def insert_submission(
     acct_handle: Optional[str] = None,
     image_hash: Optional[str] = None,
     dup_kind: Optional[str] = None,
+    content_hash: Optional[str] = None,
 ) -> dict:
     ts = _now()
     with _connect() as conn:
@@ -114,11 +119,12 @@ def insert_submission(
             """
             INSERT INTO submissions
                 (user_id, org_id, image_url, object_path, file_name, platform, status, points,
-                 analysis_json, acct_platform, acct_handle, image_hash, dup_kind, created_at, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 analysis_json, acct_platform, acct_handle, image_hash, dup_kind, content_hash,
+                 created_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (user_id, org_id, image_url, object_path, file_name, platform, status, points,
-             analysis_json, acct_platform, acct_handle, image_hash, dup_kind, ts, ts),
+             analysis_json, acct_platform, acct_handle, image_hash, dup_kind, content_hash, ts, ts),
         )
         row = conn.execute(
             "SELECT * FROM submissions WHERE id = ?", (cur.lastrowid,)
@@ -249,6 +255,19 @@ def count_user_uploads_since(user_id: str, since_iso: str) -> int:
             "SELECT COUNT(*) c FROM submissions WHERE user_id=? AND created_at >= ?",
             (user_id, since_iso),
         ).fetchone()["c"])
+
+
+def find_exact_hash_match(content_hash: str) -> Optional[dict]:
+    """O(1) indexed lookup for a TRUE re-upload (identical bytes). Returns the most recent
+    prior submission with this sha256, or None. Checked before the fuzzy Hamming scan."""
+    if not content_hash:
+        return None
+    with _connect() as conn:
+        row = conn.execute(
+            "SELECT * FROM submissions WHERE content_hash = ? ORDER BY id DESC LIMIT 1",
+            (content_hash,),
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000) -> Optional[dict]:

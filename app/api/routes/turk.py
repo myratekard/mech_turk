@@ -5,6 +5,7 @@ user (Clerk was stripped from the frontend for the self-contained build).
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import mimetypes
 import time
@@ -208,6 +209,9 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
             status_code=413, detail=f"Image is too large (max {settings.max_upload_mb} MB)."
         )
 
+    # Exact-content fingerprint (sha256 of the raw bytes) — indexed, so a true re-upload is
+    # caught with one O(1) lookup instead of the O(n) Hamming scan below.
+    content_hash = hashlib.sha256(data).hexdigest()
     uid = str(user["id"])
 
     # 1) Rate limit: cap uploads per user / 24h.
@@ -223,6 +227,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
             user_id=uid, org_id=user.get("org_id"), image_url=body.imageUrl,
             object_path=body.objectPath, file_name=body.fileName,
             platform=None, status="unsupported", points=0, analysis_json=None,
+            content_hash=content_hash,
         )
         print(f"[timing] submission #{row['id']} unsupported(gate) | {' '.join(_marks)}", flush=True)
         return _row_to_submission(row)
@@ -231,12 +236,19 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     #    short-circuits the LLM here (256-bit dHash, tight threshold). Look-alike
     #    screenshots of DIFFERENT accounts no longer match — they fall through to the
     #    engine below, where the account-level handle check is the authority on dupes.
-    try:
-        img_hash = dhash(data)
-    except Exception:
-        img_hash = None
-    match = submissions_db.find_phash_match(img_hash, settings.dhash_distance) if img_hash else None
-    _marks.append(_lap("dhash+match"))
+    # 2a) Fast path: exact re-upload (identical bytes) → one indexed lookup, no scan.
+    match = submissions_db.find_exact_hash_match(content_hash)
+    if match:
+        img_hash = match.get("image_hash")  # same image → same dHash; reuse, skip recompute
+        _marks.append(_lap("exact_hash"))
+    else:
+        # 2b) Fall back to the fuzzy near-EXACT dHash scan for re-compressed/look-alike re-uploads.
+        try:
+            img_hash = dhash(data)
+        except Exception:
+            img_hash = None
+        match = submissions_db.find_phash_match(img_hash, settings.dhash_distance) if img_hash else None
+        _marks.append(_lap("dhash+match"))
     if match:
         # Self-duplicate = the same user re-uploading the same image; others' re-upload = duplicate.
         same_user = match["user_id"] == uid
@@ -250,8 +262,9 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
             platform=match["platform"], status="duplicate", points=points,
             analysis_json=match["analysis_json"], acct_platform=match["acct_platform"],
             acct_handle=match["acct_handle"], image_hash=img_hash, dup_kind=dup_kind,
+            content_hash=content_hash,
         )
-        print(f"[timing] submission #{row['id']} duplicate(phash) | {' '.join(_marks)}", flush=True)
+        print(f"[timing] submission #{row['id']} duplicate(reupload) | {' '.join(_marks)}", flush=True)
         return _row_to_submission(row)
 
     # 3) Novel image -> run the engine (the only path that spends tokens).
@@ -267,7 +280,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
             user_id=uid, org_id=user.get("org_id"), image_url=body.imageUrl,
             object_path=body.objectPath, file_name=body.fileName,
             platform=body.platform, status="in_review", points=0,
-            analysis_json=None, image_hash=img_hash,
+            analysis_json=None, image_hash=img_hash, content_hash=content_hash,
         )
         return _row_to_submission(row)
 
@@ -299,6 +312,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
         acct_handle=acct_handle,
         image_hash=img_hash,
         dup_kind=dup_kind,
+        content_hash=content_hash,
     )
     _marks.append(_lap("total"))  # cumulative from start — last mark is the end-to-end time
     print(f"[timing] submission #{row['id']} {status} | {' '.join(_marks)}", flush=True)

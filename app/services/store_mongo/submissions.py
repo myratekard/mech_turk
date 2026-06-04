@@ -32,6 +32,7 @@ def init_db() -> None:
     c.create_index([("user_id", ASCENDING)])
     c.create_index([("status", ASCENDING)])
     c.create_index([("image_hash", ASCENDING)])
+    c.create_index([("content_hash", ASCENDING)])  # exact re-upload fast path
     c.create_index([("acct_platform", ASCENDING), ("acct_handle", ASCENDING)])
     c.create_index([("org_id", ASCENDING)])
     c.create_index([("id", ASCENDING)], unique=True)
@@ -52,6 +53,7 @@ def insert_submission(
     acct_handle: Optional[str] = None,
     image_hash: Optional[str] = None,
     dup_kind: Optional[str] = None,
+    content_hash: Optional[str] = None,
 ) -> dict:
     ts = _now()
     doc = {
@@ -68,6 +70,7 @@ def insert_submission(
         "acct_platform": acct_platform,
         "acct_handle": acct_handle,
         "image_hash": image_hash,
+        "content_hash": content_hash,
         "disputed": 0,
         "dup_kind": dup_kind,
         "invoice_id": None,
@@ -177,6 +180,13 @@ def count_user_self_duplicates(user_id: str) -> int:
 
 def count_user_uploads_since(user_id: str, since_iso: str) -> int:
     return int(_c().count_documents({"user_id": user_id, "created_at": {"$gte": since_iso}}))
+
+
+def find_exact_hash_match(content_hash: str) -> Optional[dict]:
+    """O(1) indexed lookup for a TRUE re-upload (identical bytes); most recent match or None."""
+    if not content_hash:
+        return None
+    return _c().find_one({"content_hash": content_hash}, {"_id": 0}, sort=[("id", DESCENDING)])
 
 
 def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000) -> Optional[dict]:
