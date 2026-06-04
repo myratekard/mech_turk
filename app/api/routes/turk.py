@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -193,7 +194,13 @@ def _row_to_submission(row: dict) -> Submission:
 
 @router.post("/submissions", response_model=Submission, status_code=201, tags=["submissions"])
 def create_submission(body: SubmissionInput, user: dict = Depends(get_current_user)):
+    _t0 = time.perf_counter()
+    def _lap(label: str) -> str:
+        return f"{label}={(time.perf_counter() - _t0) * 1000:.0f}ms"
+    _marks = []
+
     data = storage.read_object(body.objectPath)
+    _marks.append(_lap("r2_read"))
     if data is None:
         raise HTTPException(status_code=400, detail="Uploaded object not found")
     if len(data) > settings.max_upload_bytes:
@@ -210,12 +217,14 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
 
     # 1b) Cheap shape gate: reject obvious non-phone-screenshots before spending an LLM call.
     reason = image_gate.check_phone_screenshot(data)
+    _marks.append(_lap("gate"))
     if reason:
         row = submissions_db.insert_submission(
             user_id=uid, org_id=user.get("org_id"), image_url=body.imageUrl,
             object_path=body.objectPath, file_name=body.fileName,
             platform=None, status="unsupported", points=0, analysis_json=None,
         )
+        print(f"[timing] submission #{row['id']} unsupported(gate) | {' '.join(_marks)}", flush=True)
         return _row_to_submission(row)
 
     # 2) Image-hash pre-check: ONLY a near-EXACT re-upload of the same screenshot
@@ -227,6 +236,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     except Exception:
         img_hash = None
     match = submissions_db.find_phash_match(img_hash, settings.dhash_distance) if img_hash else None
+    _marks.append(_lap("dhash+match"))
     if match:
         # Self-duplicate = the same user re-uploading the same image; others' re-upload = duplicate.
         same_user = match["user_id"] == uid
@@ -241,6 +251,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
             analysis_json=match["analysis_json"], acct_platform=match["acct_platform"],
             acct_handle=match["acct_handle"], image_hash=img_hash, dup_kind=dup_kind,
         )
+        print(f"[timing] submission #{row['id']} duplicate(phash) | {' '.join(_marks)}", flush=True)
         return _row_to_submission(row)
 
     # 3) Novel image -> run the engine (the only path that spends tokens).
@@ -260,6 +271,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
         )
         return _row_to_submission(row)
 
+    _marks.append(_lap("pipeline"))
     status, points = map_status_points(result)
     status, points = apply_african_gate(result, status, points)  # African eligibility gate
     platform = body.platform or platform_label(result)
@@ -288,6 +300,8 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
         image_hash=img_hash,
         dup_kind=dup_kind,
     )
+    _marks.append(_lap("total"))  # cumulative from start — last mark is the end-to-end time
+    print(f"[timing] submission #{row['id']} {status} | {' '.join(_marks)}", flush=True)
     return _row_to_submission(row)
 
 
