@@ -125,8 +125,9 @@ const MAX_FILES = 50;
 // Per-image size cap (keep in sync with backend MAX_UPLOAD_MB).
 const MAX_FILE_MB = 10;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
-// How many uploads to process at once (each is a ~5s LLM call; parallelism cuts batch time).
-const UPLOAD_CONCURRENCY = 4;
+// How many uploads to process at once (each is a ~2.5s LLM call; parallelism cuts batch time).
+// Well under Gemini's rate limit at this rate; backend 429 retry/backoff covers bursts.
+const UPLOAD_CONCURRENCY = 6;
 
 export default function Upload() {
   const [files, setFiles] = useState<UploadFileState[]>([]);
