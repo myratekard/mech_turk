@@ -125,6 +125,8 @@ const MAX_FILES = 50;
 // Per-image size cap (keep in sync with backend MAX_UPLOAD_MB).
 const MAX_FILE_MB = 10;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+// How many uploads to process at once (each is a ~5s LLM call; parallelism cuts batch time).
+const UPLOAD_CONCURRENCY = 4;
 
 export default function Upload() {
   const [files, setFiles] = useState<UploadFileState[]>([]);
@@ -229,62 +231,61 @@ export default function Upload() {
     setFiles(prev => prev.filter(f => f.id !== id));
   };
 
+  // Process one queued file end-to-end: upload to storage → create submission → show verdict.
+  const processOne = async (fileState: UploadFileState) => {
+    setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "uploading", progress: 10 } : f));
+    // Simulate progress for UI since useUpload's progress isn't mapped per-file here.
+    const progressInterval = setInterval(() => {
+      setFiles(prev => prev.map(f =>
+        (f.id === fileState.id && f.progress < 90) ? { ...f, progress: f.progress + 10 } : f));
+    }, 300);
+    try {
+      const result = await uploadFile(fileState.file);
+      if (!result) throw new Error("Upload failed");
+
+      // Create the submission record and read the verdict.
+      const created: any = await createSubmission.mutateAsync({
+        data: {
+          imageUrl: `/api/storage/objects/${result.objectPath.replace(/^\/objects\//, "")}`,
+          objectPath: result.objectPath,
+          fileName: result.metadata.name,
+        },
+      });
+      clearInterval(progressInterval);
+
+      // Surface the verdict on the row, then pulse it out: hold ~2.4s so the user sees
+      // the result + confetti for accepts, then fade + collapse the row away.
+      const verdict = ((created?.status as Verdict) ?? "accepted");
+      setFiles(prev => prev.map(f => f.id === fileState.id
+        ? { ...f, status: "done", progress: 100, verdict, points: created?.points }
+        : f));
+      setTimeout(() => {
+        setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, leaving: true } : f));
+        setTimeout(() => removeFile(fileState.id), 360);
+      }, 2400);
+    } catch (err) {
+      clearInterval(progressInterval);
+      setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "error", error: "Upload failed" } : f));
+    }
+  };
+
   const startUploads = async () => {
     const pendingFiles = files.filter(f => f.status === "pending" || f.status === "error");
-
     if (pendingFiles.length === 0) return;
 
-    for (const fileState of pendingFiles) {
-      // Update status to uploading
-      setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "uploading", progress: 10 } : f));
-      
-      try {
-        // Simulate progress for UI since useUpload's progress isn't easily mapped per-file in this loop
-        const progressInterval = setInterval(() => {
-          setFiles(prev => prev.map(f => {
-            if (f.id === fileState.id && f.progress < 90) {
-              return { ...f, progress: f.progress + 10 };
-            }
-            return f;
-          }));
-        }, 300);
-
-        const result = await uploadFile(fileState.file);
-
-        if (!result) {
-          clearInterval(progressInterval);
-          throw new Error("Upload failed");
-        }
-
-        // Create the submission record and read the verdict so we can flag duplicates.
-        const created: any = await createSubmission.mutateAsync({
-          data: {
-            imageUrl: `/api/storage/objects/${result.objectPath.replace(/^\/objects\//, "")}`,
-            objectPath: result.objectPath,
-            fileName: result.metadata.name,
-          },
-        });
-        clearInterval(progressInterval);
-
-        // Surface the actual verdict (accepted / in_review / duplicate / invalid /
-        // unsupported) on the row, then pulse it out: hold ~2.4s so the user sees
-        // the result + confetti for accepts, then fade + collapse the row away.
-        const verdict = ((created?.status as Verdict) ?? "accepted");
-        setFiles(prev => prev.map(f => f.id === fileState.id
-          ? { ...f, status: "done", progress: 100, verdict, points: created?.points }
-          : f));
-        setTimeout(() => {
-          setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, leaving: true } : f));
-          setTimeout(() => removeFile(fileState.id), 360);
-        }, 2400);
-      } catch (err) {
-        // Update to error
-        setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "error", error: "Upload failed" } : f));
+    // Worker pool: up to UPLOAD_CONCURRENCY uploads in flight at once (vs one-at-a-time),
+    // which cuts wall-clock for bulk uploads ~N×. The backend's 429 retry/backoff absorbs
+    // any transient Gemini rate-limit pressure from the extra concurrency.
+    const queue = [...pendingFiles];
+    const worker = async () => {
+      for (let next = queue.shift(); next; next = queue.shift()) {
+        await processOne(next);
       }
-    }
-    
-    // No toasts — confetti + the per-row verdict (incl. fuchsia "Duplicate" rows)
-    // already convey the outcome.
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(UPLOAD_CONCURRENCY, queue.length) }, () => worker()),
+    );
+    // No toasts — confetti + the per-row verdict already convey the outcome.
   };
 
   const pendingCount = files.filter(f => f.status === "pending" || f.status === "error").length;

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import io
 import time
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
 
 import cv2
+
+from app.core.config import settings
 
 from app.schemas.models import (
     AnalysisResult,
@@ -17,6 +20,28 @@ from app.services import badge_cv, fusion
 from app.services.badge_cv import bgr_from_bytes
 from app.services.store import ArtifactStore
 from app.services.vision_llm import analyze_screenshot
+
+
+def _downscale_for_llm(image_bytes: bytes, mime: str) -> tuple[bytes, str]:
+    """Return a smaller JPEG (longest edge <= llm_image_max_dim) to send to the LLM — faster
+    upload/inference and fewer image tokens. Full-res bytes are kept for the CV check. Falls
+    back to the original on any error or when already small enough."""
+    max_dim = settings.llm_image_max_dim
+    if not max_dim:
+        return image_bytes, mime
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(image_bytes))
+        w, h = im.size
+        if max(w, h) <= max_dim:
+            return image_bytes, mime
+        scale = max_dim / float(max(w, h))
+        im = im.convert("RGB").resize((max(1, int(w * scale)), max(1, int(h * scale))), Image.LANCZOS)
+        buf = io.BytesIO()
+        im.save(buf, format="JPEG", quality=85)
+        return buf.getvalue(), "image/jpeg"
+    except Exception:
+        return image_bytes, mime
 
 
 def _build_profile(va: VisionAnalysis) -> ProfileArtifact:
@@ -53,9 +78,11 @@ def analyze(
     created_at = datetime.now(timezone.utc).isoformat()
     warnings: List[str] = []
 
-    # 1) Vision analysis (platform + verdict + fields) in one call
+    # 1) Vision analysis (platform + verdict + fields) in one call — on a downscaled copy
+    #    (full-res image_bytes is reserved for the CV check below).
     _t = time.perf_counter()
-    va = analyze_screenshot(image_bytes, mime=mime)
+    llm_bytes, llm_mime = _downscale_for_llm(image_bytes, mime)
+    va = analyze_screenshot(llm_bytes, mime=llm_mime)
     llm_ms = (time.perf_counter() - _t) * 1000
 
     # 2) Independent CV second opinion: template-match the verified tick
@@ -63,7 +90,8 @@ def analyze(
     bgr = bgr_from_bytes(image_bytes)
     cv_signal = badge_cv.detect(bgr)
     cv_ms = (time.perf_counter() - _t) * 1000
-    print(f"[timing] pipeline: llm={llm_ms:.0f}ms cv={cv_ms:.0f}ms bytes={len(image_bytes)}", flush=True)
+    print(f"[timing] pipeline: llm={llm_ms:.0f}ms cv={cv_ms:.0f}ms "
+          f"orig={len(image_bytes)} llm_bytes={len(llm_bytes)}", flush=True)
 
     # 3) Fuse the two signals (lenient policy)
     llm_signal = fusion.to_llm_signal(va)
