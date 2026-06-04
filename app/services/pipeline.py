@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -53,11 +54,16 @@ def analyze(
     warnings: List[str] = []
 
     # 1) Vision analysis (platform + verdict + fields) in one call
+    _t = time.perf_counter()
     va = analyze_screenshot(image_bytes, mime=mime)
+    llm_ms = (time.perf_counter() - _t) * 1000
 
     # 2) Independent CV second opinion: template-match the verified tick
+    _t = time.perf_counter()
     bgr = bgr_from_bytes(image_bytes)
     cv_signal = badge_cv.detect(bgr)
+    cv_ms = (time.perf_counter() - _t) * 1000
+    print(f"[timing] pipeline: llm={llm_ms:.0f}ms cv={cv_ms:.0f}ms bytes={len(image_bytes)}", flush=True)
 
     # 3) Fuse the two signals (lenient policy)
     llm_signal = fusion.to_llm_signal(va)
