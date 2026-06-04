@@ -21,15 +21,22 @@ const VERDICT: Record<Verdict, { label: string; Icon: any; text: string; ring: s
 };
 
 const CONFETTI_COLORS = [
-  "#22c55e", "#16a34a", "#4ade80", "#06b6d4", "#22d3ee", "#a855f7",
-  "#d946ef", "#f59e0b", "#fbbf24", "#ec4899", "#f43f5e", "#ffffff",
+  "#22c55e", "#16a34a", "#4ade80", "#a3e635", "#84cc16", "#06b6d4",
+  "#22d3ee", "#38bdf8", "#3b82f6", "#6366f1", "#a855f7", "#c084fc",
+  "#d946ef", "#ec4899", "#f43f5e", "#f59e0b", "#fbbf24", "#fde047",
+  "#fb923c", "#ffffff",
 ];
-const CONFETTI_SIZES = [5, 6, 7, 8, 9, 10];
+const CONFETTI_SIZES = [5, 6, 7, 8, 9, 10, 11, 12, 14];
+// Mixed shapes for a fuller, varied burst (clip-paths + radii applied per particle).
+const STAR = "polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)";
+const TRI = "polygon(50% 0%, 0% 100%, 100% 100%)";
+const DIAMOND = "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)";
+const SHAPES = ["circle", "square", "rect", "triangle", "star", "diamond", "circle", "rect"] as const;
 
-// Lightweight, dependency-free confetti — a full fountain burst (upward fan + gravity
-// fall) of varied colours, sizes and shapes, via the Web Animations API. Mounted only
-// for accepted uploads; self-cleaning (~1.7s). Particles overflow the row frame.
-function ConfettiBurst({ count = 48 }: { count?: number }) {
+// Lightweight, dependency-free confetti — a full, dense fountain burst (upward fan + gravity
+// fall) of many colours, sizes and shapes, via the Web Animations API. Mounted only for
+// accepted uploads; self-cleaning (~1.8s). Particles overflow the row frame.
+function ConfettiBurst({ count = 90 }: { count?: number }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const root = ref.current;
@@ -56,14 +63,18 @@ function ConfettiBurst({ count = 48 }: { count?: number }) {
   return (
     <div ref={ref} aria-hidden className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center overflow-visible">
       {Array.from({ length: count }).map((_, i) => {
-        const size = CONFETTI_SIZES[i % CONFETTI_SIZES.length];
-        return (
-          <span
-            key={i}
-            className={`absolute ${i % 3 === 0 ? "rounded-full" : "rounded-[1px]"}`}
-            style={{ width: size, height: i % 4 === 0 ? size * 1.8 : size, background: CONFETTI_COLORS[i % CONFETTI_COLORS.length] }}
-          />
-        );
+        const shape = SHAPES[i % SHAPES.length];
+        const size = CONFETTI_SIZES[(i * 3) % CONFETTI_SIZES.length];
+        const color = CONFETTI_COLORS[(i * 7) % CONFETTI_COLORS.length];
+        let w = size, h = size;
+        const st: React.CSSProperties = { background: color };
+        if (shape === "circle") st.borderRadius = "50%";
+        else if (shape === "square") st.borderRadius = 1;
+        else if (shape === "rect") { w = Math.max(3, Math.round(size * 0.5)); h = Math.round(size * 2.6); st.borderRadius = 1; } // streamer
+        else if (shape === "triangle") st.clipPath = TRI;
+        else if (shape === "star") { w = Math.round(size * 1.5); h = w; st.clipPath = STAR; }
+        else if (shape === "diamond") st.clipPath = DIAMOND;
+        return <span key={i} className="absolute" style={{ ...st, width: w, height: h }} />;
       })}
     </div>
   );
@@ -114,6 +125,8 @@ const MAX_FILES = 50;
 // Per-image size cap (keep in sync with backend MAX_UPLOAD_MB).
 const MAX_FILE_MB = 10;
 const MAX_FILE_BYTES = MAX_FILE_MB * 1024 * 1024;
+// How many uploads to process at once (each is a ~5s LLM call; parallelism cuts batch time).
+const UPLOAD_CONCURRENCY = 4;
 
 export default function Upload() {
   const [files, setFiles] = useState<UploadFileState[]>([]);
@@ -218,62 +231,61 @@ export default function Upload() {
     setFiles(prev => prev.filter(f => f.id !== id));
   };
 
+  // Process one queued file end-to-end: upload to storage → create submission → show verdict.
+  const processOne = async (fileState: UploadFileState) => {
+    setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "uploading", progress: 10 } : f));
+    // Simulate progress for UI since useUpload's progress isn't mapped per-file here.
+    const progressInterval = setInterval(() => {
+      setFiles(prev => prev.map(f =>
+        (f.id === fileState.id && f.progress < 90) ? { ...f, progress: f.progress + 10 } : f));
+    }, 300);
+    try {
+      const result = await uploadFile(fileState.file);
+      if (!result) throw new Error("Upload failed");
+
+      // Create the submission record and read the verdict.
+      const created: any = await createSubmission.mutateAsync({
+        data: {
+          imageUrl: `/api/storage/objects/${result.objectPath.replace(/^\/objects\//, "")}`,
+          objectPath: result.objectPath,
+          fileName: result.metadata.name,
+        },
+      });
+      clearInterval(progressInterval);
+
+      // Surface the verdict on the row, then pulse it out: hold ~2.4s so the user sees
+      // the result + confetti for accepts, then fade + collapse the row away.
+      const verdict = ((created?.status as Verdict) ?? "accepted");
+      setFiles(prev => prev.map(f => f.id === fileState.id
+        ? { ...f, status: "done", progress: 100, verdict, points: created?.points }
+        : f));
+      setTimeout(() => {
+        setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, leaving: true } : f));
+        setTimeout(() => removeFile(fileState.id), 360);
+      }, 2400);
+    } catch (err) {
+      clearInterval(progressInterval);
+      setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "error", error: "Upload failed" } : f));
+    }
+  };
+
   const startUploads = async () => {
     const pendingFiles = files.filter(f => f.status === "pending" || f.status === "error");
-
     if (pendingFiles.length === 0) return;
 
-    for (const fileState of pendingFiles) {
-      // Update status to uploading
-      setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "uploading", progress: 10 } : f));
-      
-      try {
-        // Simulate progress for UI since useUpload's progress isn't easily mapped per-file in this loop
-        const progressInterval = setInterval(() => {
-          setFiles(prev => prev.map(f => {
-            if (f.id === fileState.id && f.progress < 90) {
-              return { ...f, progress: f.progress + 10 };
-            }
-            return f;
-          }));
-        }, 300);
-
-        const result = await uploadFile(fileState.file);
-
-        if (!result) {
-          clearInterval(progressInterval);
-          throw new Error("Upload failed");
-        }
-
-        // Create the submission record and read the verdict so we can flag duplicates.
-        const created: any = await createSubmission.mutateAsync({
-          data: {
-            imageUrl: `/api/storage/objects/${result.objectPath.replace(/^\/objects\//, "")}`,
-            objectPath: result.objectPath,
-            fileName: result.metadata.name,
-          },
-        });
-        clearInterval(progressInterval);
-
-        // Surface the actual verdict (accepted / in_review / duplicate / invalid /
-        // unsupported) on the row, then pulse it out: hold ~2.4s so the user sees
-        // the result + confetti for accepts, then fade + collapse the row away.
-        const verdict = ((created?.status as Verdict) ?? "accepted");
-        setFiles(prev => prev.map(f => f.id === fileState.id
-          ? { ...f, status: "done", progress: 100, verdict, points: created?.points }
-          : f));
-        setTimeout(() => {
-          setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, leaving: true } : f));
-          setTimeout(() => removeFile(fileState.id), 360);
-        }, 2400);
-      } catch (err) {
-        // Update to error
-        setFiles(prev => prev.map(f => f.id === fileState.id ? { ...f, status: "error", error: "Upload failed" } : f));
+    // Worker pool: up to UPLOAD_CONCURRENCY uploads in flight at once (vs one-at-a-time),
+    // which cuts wall-clock for bulk uploads ~N×. The backend's 429 retry/backoff absorbs
+    // any transient Gemini rate-limit pressure from the extra concurrency.
+    const queue = [...pendingFiles];
+    const worker = async () => {
+      for (let next = queue.shift(); next; next = queue.shift()) {
+        await processOne(next);
       }
-    }
-    
-    // No toasts — confetti + the per-row verdict (incl. fuchsia "Duplicate" rows)
-    // already convey the outcome.
+    };
+    await Promise.all(
+      Array.from({ length: Math.min(UPLOAD_CONCURRENCY, queue.length) }, () => worker()),
+    );
+    // No toasts — confetti + the per-row verdict already convey the outcome.
   };
 
   const pendingCount = files.filter(f => f.status === "pending" || f.status === "error").length;

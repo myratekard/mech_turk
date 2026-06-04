@@ -84,6 +84,10 @@ class Settings:
     # account-level handle check decides — so two different profiles can't be collapsed.
     dhash_distance: int = int(os.getenv("DHASH_DISTANCE", "12"))
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "10"))             # per-image size cap
+    # Downscale the image SENT TO THE LLM to this longest-edge px (full-res still used for CV).
+    # Big phone screenshots (5-8MB) are slow to upload/process and cost more tokens; the badge
+    # is legible well under this. 0 disables downscaling.
+    llm_image_max_dim: int = int(os.getenv("LLM_IMAGE_MAX_DIM", "1280"))
 
     # Public base URL of the frontend, used to build registration links in emails.
     app_base_url: str = os.getenv("APP_BASE_URL", "http://localhost:5173")
