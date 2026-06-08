@@ -415,18 +415,20 @@ def list_submissions(
 
 def list_all_submissions(
     status: Optional[str], org_id: Optional[str], african: Optional[str],
-    mine_user_id: Optional[str], page: int, limit: int,
+    user_ids: Optional[List[str]], page: int, limit: int,
 ) -> Tuple[List[dict], int]:
-    """Admin-wide listing (superuser/turk_admin): filter by status, org and the African
-    classification (parsed from analysis_json); mine_user_id scopes to one uploader."""
+    """Admin-wide listing (superuser/turk_admin): filter by status, org, African
+    classification (from analysis_json), and an optional set of uploader ids."""
     import json as _json
+    if user_ids is not None and not user_ids:
+        return [], 0  # a user filter that matched nobody
     where, params = "WHERE 1=1", []
     if status:
         where += " AND status = ?"; params.append(status)
     if org_id:
         where += " AND org_id = ?"; params.append(org_id)
-    if mine_user_id is not None:
-        where += " AND user_id = ?"; params.append(mine_user_id)
+    if user_ids is not None:
+        where += f" AND user_id IN ({','.join('?' * len(user_ids))})"; params += user_ids
     with _connect() as conn:
         rows = [dict(r) for r in conn.execute(
             f"SELECT * FROM submissions {where} ORDER BY id DESC", params

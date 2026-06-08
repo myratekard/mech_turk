@@ -185,6 +185,7 @@ export interface AdminSubmissionParams {
   status?: string;
   org_id?: string;
   african?: string;
+  user?: string;   // uploader name/email substring
 }
 
 export const api = {
@@ -207,6 +208,7 @@ export const api = {
     if (p.status) q.set("status", p.status);
     if (p.org_id) q.set("org_id", p.org_id);
     if (p.african) q.set("african", p.african);
+    if (p.user) q.set("user", p.user);
     return apiFetch<AdminSubmissionPage>(`/api/admin/submissions?${q.toString()}`);
   },
   adminSubmissionOrgs: () => apiFetch<{ id: string; name: string }[]>("/api/admin/submission-orgs"),

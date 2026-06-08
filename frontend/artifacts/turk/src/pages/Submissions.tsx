@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { Link } from "wouter";
 import { ChevronLeft, ChevronRight, Activity, ExternalLink, Filter, Flag, CheckCircle2, UploadCloud, AlertTriangle } from "lucide-react";
 import type { ListSubmissionsStatus } from "@workspace/api-client-react";
@@ -31,6 +32,7 @@ export default function Submissions() {
   const [scope, setScope] = useState<"mine" | "all">("all");        // reviewers only
   const [orgFilter, setOrgFilter] = useState<string>("all");
   const [africanFilter, setAfricanFilter] = useState<string>("all");
+  const [userFilter, setUserFilter] = useState<string>("");
   const [disputingId, setDisputingId] = useState<number | null>(null);
   const [disputeError, setDisputeError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -51,6 +53,7 @@ export default function Submissions() {
     ...(statusFilter !== "all" ? { status: statusFilter } : {}),
     ...(orgFilter !== "all" ? { org_id: orgFilter } : {}),
     ...(africanFilter !== "all" ? { african: africanFilter } : {}),
+    ...(userFilter.trim() ? { user: userFilter.trim() } : {}),
   };
   const adminQ = useQuery({
     queryKey: ["adminSubs", adminParams],
@@ -150,6 +153,12 @@ export default function Submissions() {
 
           {adminAll && (
             <>
+              <Input
+                value={userFilter}
+                onChange={(e) => { setUserFilter(e.target.value); setPage(1); }}
+                placeholder="Filter by user (name/email)…"
+                className="h-10 w-[220px] text-xs"
+              />
               <div className="flex items-center gap-2 bg-card border border-border rounded-lg p-1">
                 <Select value={orgFilter} onValueChange={(v) => { setOrgFilter(v); setPage(1); }}>
                   <SelectTrigger className="w-[150px] h-8 text-xs border-0 bg-transparent focus:ring-0 shadow-none font-mono"><SelectValue placeholder="All Orgs" /></SelectTrigger>
@@ -191,7 +200,7 @@ export default function Submissions() {
                   <TableHead className="font-bold uppercase text-xs tracking-wider">Status</TableHead>
                   <TableHead className="font-bold uppercase text-xs tracking-wider">Points</TableHead>
                   <TableHead className="text-right font-bold uppercase text-xs tracking-wider">Date</TableHead>
-                  <TableHead className="text-right font-bold uppercase text-xs tracking-wider">Action</TableHead>
+                  <TableHead className="text-right font-bold uppercase text-xs tracking-wider sticky right-0 bg-muted/30 border-l border-border">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -264,7 +273,7 @@ export default function Submissions() {
                         {format(new Date(sub.createdAt), "MMM d, yyyy")}
                         <div className="opacity-50 mt-1">{format(new Date(sub.createdAt), "HH:mm")}</div>
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="text-right sticky right-0 bg-card group-hover:bg-muted/20 border-l border-border">
                         {sub.disputed ? (
                           <span className="text-xs text-muted-foreground">{sub.status === "in_review" ? "Awaiting review" : "Disputed"}</span>
                         ) : isOwn(sub) && DISPUTABLE.includes(sub.status) ? (

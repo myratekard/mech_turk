@@ -287,18 +287,20 @@ def list_submissions(
 
 def list_all_submissions(
     status: Optional[str], org_id: Optional[str], african: Optional[str],
-    mine_user_id: Optional[str], page: int, limit: int,
+    user_ids: Optional[List[str]], page: int, limit: int,
 ) -> Tuple[List[dict], int]:
-    """Admin-wide listing (superuser/turk_admin): filter by status, org and the African
-    classification (parsed from analysis_json); mine_user_id scopes to one uploader."""
+    """Admin-wide listing (superuser/turk_admin): filter by status, org, African
+    classification (from analysis_json), and an optional set of uploader ids."""
     import json as _json
+    if user_ids is not None and not user_ids:
+        return [], 0  # a user filter that matched nobody
     q: dict = {}
     if status:
         q["status"] = status
     if org_id:
         q["org_id"] = org_id
-    if mine_user_id is not None:
-        q["user_id"] = mine_user_id
+    if user_ids is not None:
+        q["user_id"] = {"$in": user_ids}
     rows = list(_c().find(q, {"_id": 0}).sort("id", DESCENDING))
     if african:
         def _cls(r):

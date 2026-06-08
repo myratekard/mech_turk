@@ -93,14 +93,24 @@ def admin_submissions(
     status: Optional[str] = Query(default=None),
     org_id: Optional[str] = Query(default=None),
     african: Optional[str] = Query(default=None, pattern="^(african|non_african|generic|unclear)$"),
+    user_q: Optional[str] = Query(default=None, alias="user"),   # name/email substring
     mine: bool = Query(default=False),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
-    user: dict = Depends(_reviewer),
+    actor: dict = Depends(_reviewer),
 ):
-    """Platform-wide submission browser for reviewers. mine=true scopes to the actor's own."""
-    mine_uid = str(user["id"]) if mine else None
-    rows, total = submissions_db.list_all_submissions(status, org_id, african, mine_uid, page, limit)
+    """Platform-wide submission browser for reviewers. mine=true scopes to the actor;
+    user=<text> filters by uploader name/email (resolved to matching accounts)."""
+    user_ids: Optional[list[str]] = None
+    if mine:
+        user_ids = [str(actor["id"])]
+    elif user_q and user_q.strip():
+        q = user_q.strip().lower()
+        user_ids = [
+            str(u["id"]) for u in auth_db.list_users()
+            if q in (u.get("username") or "").lower() or q in (u.get("email") or "").lower()
+        ]
+    rows, total = submissions_db.list_all_submissions(status, org_id, african, user_ids, page, limit)
     subs = [_row_to_submission(r) for r in rows]
     # Enrich each row with the uploader's username (cached per request).
     cache: dict = {}
