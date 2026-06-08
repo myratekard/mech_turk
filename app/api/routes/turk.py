@@ -157,15 +157,19 @@ def _org_name(org_id) -> Optional[str]:
     return _ORG_NAME_CACHE[org_id]
 
 
-def _african_descent(row: dict):
-    """The LLM's informational guess, stored as a top-level key in analysis_json."""
+def _analysis(row: dict) -> dict:
     aj = row.get("analysis_json")
     if not aj:
-        return None
+        return {}
     try:
-        return json.loads(aj).get("appears_african_descent")
+        return json.loads(aj)
     except Exception:
-        return None
+        return {}
+
+
+def _african_descent(row: dict):
+    """The LLM's informational guess, stored as a top-level key in analysis_json."""
+    return _analysis(row).get("appears_african_descent")
 
 
 def _row_to_submission(row: dict) -> Submission:
@@ -185,6 +189,7 @@ def _row_to_submission(row: dict) -> Submission:
         settledAt=row.get("settled_at"),
         settledVia=_org_name(row.get("org_id")) if settled else None,
         africanDescent=_african_descent(row),
+        africanClass=_analysis(row).get("african_classification"),
         acctHandle=row.get("acct_handle"),
         orgId=str(row["org_id"]) if row.get("org_id") else None,
         orgName=_org_name(row.get("org_id")),

@@ -7,13 +7,15 @@ from __future__ import annotations
 
 import json
 import mimetypes
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.api.deps import get_current_user, require_roles, require_superuser
 from app.api.routes.auth import to_user_out
-from app.api.routes.turk import map_status_points, platform_label, apply_african_gate, regular_duplicate_points
+from app.api.routes.turk import map_status_points, platform_label, apply_african_gate, regular_duplicate_points, _row_to_submission
+from app.schemas.api_models import SubmissionList
 from app.core.config import settings
 from app.schemas.auth_models import (
     CreateOrgInput,
@@ -83,6 +85,38 @@ def review_queue(
 ):
     rows, total = submissions_db.list_review_queue(page, limit)
     return ReviewQueue(items=[_row_to_review_item(r) for r in rows], total=total, page=page, limit=limit)
+
+
+# ----------------------------------------------- all submissions (superuser/turk_admin)
+@router.get("/submissions", response_model=SubmissionList)
+def admin_submissions(
+    status: Optional[str] = Query(default=None),
+    org_id: Optional[str] = Query(default=None),
+    african: Optional[str] = Query(default=None, pattern="^(african|non_african|generic|unclear)$"),
+    mine: bool = Query(default=False),
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    user: dict = Depends(_reviewer),
+):
+    """Platform-wide submission browser for reviewers. mine=true scopes to the actor's own."""
+    mine_uid = str(user["id"]) if mine else None
+    rows, total = submissions_db.list_all_submissions(status, org_id, african, mine_uid, page, limit)
+    subs = [_row_to_submission(r) for r in rows]
+    # Enrich each row with the uploader's username (cached per request).
+    cache: dict = {}
+    for s in subs:
+        uid = s.userId
+        if uid not in cache:
+            u = auth_db.get_user_by_id(int(uid)) if str(uid).isdigit() else None
+            cache[uid] = (u or {}).get("username")
+        s.username = cache[uid]
+    return SubmissionList(submissions=subs, total=total, page=page, limit=limit)
+
+
+@router.get("/submission-orgs")
+def submission_orgs(_: dict = Depends(_reviewer)):
+    """Org options for the admin submissions filter (reviewer-accessible org list)."""
+    return [{"id": o["clerk_org_id"], "name": o.get("name")} for o in auth_db.list_clerk_orgs()]
 
 
 @router.post("/submissions/{submission_id}/approve")

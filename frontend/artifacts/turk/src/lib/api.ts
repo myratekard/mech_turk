@@ -153,6 +153,40 @@ export interface ReviewItem {
 }
 
 // ---- auth (Clerk-backed; login/signup happen in Clerk UI) ----
+export interface AdminSubmission {
+  id: number;
+  userId: string;
+  username?: string | null;
+  imageUrl: string;
+  fileName?: string | null;
+  platform?: string | null;
+  status: string;
+  points: number;
+  dupKind?: string | null;
+  disputed?: boolean;
+  orgId?: string | null;
+  orgName?: string | null;
+  acctHandle?: string | null;
+  africanDescent?: boolean | null;
+  africanClass?: "african" | "non_african" | "generic" | "unclear" | null;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface AdminSubmissionPage {
+  submissions: AdminSubmission[];
+  total: number;
+  page: number;
+  limit: number;
+}
+export interface AdminSubmissionParams {
+  page?: number;
+  limit?: number;
+  mine?: boolean;
+  status?: string;
+  org_id?: string;
+  african?: string;
+}
+
 export const api = {
   me: () => apiFetch<User>("/api/auth/me"),
   refInfo: (code: string) => apiFetch<RefInfo>(`/api/auth/ref/${code}`),
@@ -165,6 +199,17 @@ export const api = {
       `/api/admin/review-queue?page=${page}&limit=${limit}`,
     ),
   reviewCount: () => apiFetch<{ count: number }>("/api/admin/review-queue/count"),
+  adminSubmissions: (p: AdminSubmissionParams = {}) => {
+    const q = new URLSearchParams();
+    if (p.page) q.set("page", String(p.page));
+    if (p.limit) q.set("limit", String(p.limit));
+    if (p.mine) q.set("mine", "true");
+    if (p.status) q.set("status", p.status);
+    if (p.org_id) q.set("org_id", p.org_id);
+    if (p.african) q.set("african", p.african);
+    return apiFetch<AdminSubmissionPage>(`/api/admin/submissions?${q.toString()}`);
+  },
+  adminSubmissionOrgs: () => apiFetch<{ id: string; name: string }[]>("/api/admin/submission-orgs"),
   approve: (id: number) => apiFetch(`/api/admin/submissions/${id}/approve`, { method: "POST" }),
   reject: (id: number) => apiFetch(`/api/admin/submissions/${id}/reject`, { method: "POST" }),
   rerun: (id: number) => apiFetch(`/api/admin/submissions/${id}/rerun`, { method: "POST" }),

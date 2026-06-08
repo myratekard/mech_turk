@@ -285,6 +285,36 @@ def list_submissions(
     return list(rows), int(total)
 
 
+def list_all_submissions(
+    status: Optional[str], org_id: Optional[str], african: Optional[str],
+    mine_user_id: Optional[str], page: int, limit: int,
+) -> Tuple[List[dict], int]:
+    """Admin-wide listing (superuser/turk_admin): filter by status, org and the African
+    classification (parsed from analysis_json); mine_user_id scopes to one uploader."""
+    import json as _json
+    q: dict = {}
+    if status:
+        q["status"] = status
+    if org_id:
+        q["org_id"] = org_id
+    if mine_user_id is not None:
+        q["user_id"] = mine_user_id
+    rows = list(_c().find(q, {"_id": 0}).sort("id", DESCENDING))
+    if african:
+        def _cls(r):
+            aj = r.get("analysis_json")
+            if not aj:
+                return None
+            try:
+                return _json.loads(aj).get("african_classification")
+            except Exception:
+                return None
+        rows = [r for r in rows if _cls(r) == african]
+    total = len(rows)
+    start = (page - 1) * limit
+    return rows[start:start + limit], total
+
+
 def get_submission(user_id: str, submission_id: int) -> Optional[dict]:
     return _c().find_one({"id": submission_id, "user_id": user_id}, {"_id": 0})
 

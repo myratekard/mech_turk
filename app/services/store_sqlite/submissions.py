@@ -413,6 +413,39 @@ def list_submissions(
     return [dict(r) for r in rows], int(total)
 
 
+def list_all_submissions(
+    status: Optional[str], org_id: Optional[str], african: Optional[str],
+    mine_user_id: Optional[str], page: int, limit: int,
+) -> Tuple[List[dict], int]:
+    """Admin-wide listing (superuser/turk_admin): filter by status, org and the African
+    classification (parsed from analysis_json); mine_user_id scopes to one uploader."""
+    import json as _json
+    where, params = "WHERE 1=1", []
+    if status:
+        where += " AND status = ?"; params.append(status)
+    if org_id:
+        where += " AND org_id = ?"; params.append(org_id)
+    if mine_user_id is not None:
+        where += " AND user_id = ?"; params.append(mine_user_id)
+    with _connect() as conn:
+        rows = [dict(r) for r in conn.execute(
+            f"SELECT * FROM submissions {where} ORDER BY id DESC", params
+        ).fetchall()]
+    if african:
+        def _cls(r):
+            aj = r.get("analysis_json")
+            if not aj:
+                return None
+            try:
+                return _json.loads(aj).get("african_classification")
+            except Exception:
+                return None
+        rows = [r for r in rows if _cls(r) == african]
+    total = len(rows)
+    start = (page - 1) * limit
+    return rows[start:start + limit], total
+
+
 def get_submission(user_id: str, submission_id: int) -> Optional[dict]:
     with _connect() as conn:
         row = conn.execute(
