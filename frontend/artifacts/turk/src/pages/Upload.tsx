@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { compressImage } from "@/lib/compressImage";
 
 // Per-upload verdict returned by the backend, with its display treatment.
 type Verdict = "accepted" | "in_review" | "duplicate" | "invalid" | "unsupported";
@@ -241,7 +242,9 @@ export default function Upload() {
         (f.id === fileState.id && f.progress < 90) ? { ...f, progress: f.progress + 10 } : f));
     }, 300);
     try {
-      const result = await uploadFile(fileState.file);
+      // Downscale/re-encode in the browser first so the upload is small & resilient on slow links.
+      const toUpload = await compressImage(fileState.file);
+      const result = await uploadFile(toUpload);
       if (!result) throw new Error("Upload failed");
 
       // Create the submission record and read the verdict.
