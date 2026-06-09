@@ -200,7 +200,7 @@ export default function Submissions() {
                   <TableHead className="font-bold uppercase text-xs tracking-wider">Status</TableHead>
                   <TableHead className="font-bold uppercase text-xs tracking-wider">Points</TableHead>
                   <TableHead className="text-right font-bold uppercase text-xs tracking-wider">Date</TableHead>
-                  <TableHead className="text-right font-bold uppercase text-xs tracking-wider sticky right-0 bg-muted/30 border-l border-border">Action</TableHead>
+                  <TableHead className="text-right font-bold uppercase text-xs tracking-wider">Action</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -273,7 +273,7 @@ export default function Submissions() {
                         {format(new Date(sub.createdAt), "MMM d, yyyy")}
                         <div className="opacity-50 mt-1">{format(new Date(sub.createdAt), "HH:mm")}</div>
                       </TableCell>
-                      <TableCell className="text-right sticky right-0 bg-card group-hover:bg-muted/20 border-l border-border">
+                      <TableCell className="text-right">
                         {sub.disputed ? (
                           <span className="text-xs text-muted-foreground">{sub.status === "in_review" ? "Awaiting review" : "Disputed"}</span>
                         ) : isOwn(sub) && DISPUTABLE.includes(sub.status) ? (
