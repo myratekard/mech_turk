@@ -14,6 +14,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from fastapi.responses import JSONResponse
+from starlette.requests import ClientDisconnect
 
 from app.api.deps import get_current_user
 from app.core.config import settings
@@ -114,7 +115,15 @@ def request_upload_url(body: UploadUrlRequest):
 
 @router.put("/storage/upload/{object_id}", tags=["Storage"])
 async def upload_object(object_id: str, request: Request):
-    data = await request.body()
+    try:
+        data = await request.body()
+    except ClientDisconnect:
+        # The client dropped mid-upload (slow/flaky connection or navigated away). Nothing to
+        # save — return a clean 4xx instead of letting it surface as an unhandled 500 traceback.
+        return JSONResponse(
+            status_code=499,
+            content={"error": "Upload interrupted — the connection dropped before the file finished uploading. Please try again."},
+        )
     if not data:
         raise HTTPException(status_code=400, detail="Empty upload body")
     if len(data) > settings.max_upload_bytes:
