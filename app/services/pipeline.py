@@ -101,7 +101,7 @@ def analyze(
         warnings.append(
             f"Signal disagreement: LLM verified={llm_signal.is_verified} "
             f"(conf {llm_signal.confidence}), CV matched={cv_signal.matched} "
-            f"(score {cv_signal.score}) — routed to review."
+            f"(score {cv_signal.score})."
         )
     if va.platform == "unknown":
         warnings.append("Platform could not be confidently identified.")

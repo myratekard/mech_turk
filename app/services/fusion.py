@@ -60,7 +60,15 @@ def fuse(llm: LLMSignal, cv: CVSignal, badge_bbox=None) -> VerificationResult:
             llm_signal=llm, cv_signal=cv, badge_bbox=badge_bbox,
         )
 
-    # Disagreement (one says verified, the other does not) -> human review.
+    # Disagreement. The CV detector is a pixel-level template match and is fragile to client-side
+    # compression — it can miss a badge the LLM clearly reads. So when the LLM is HIGH-confidence
+    # verified, trust it (CV just trims confidence); only route to review when the LLM itself is
+    # borderline, or when CV sees a badge the LLM missed.
+    if llm_high and llm.is_verified and not cv_yes:
+        return VerificationResult(
+            verified=True, confidence=0.8, needs_review=False,
+            llm_signal=llm, cv_signal=cv, badge_bbox=badge_bbox,
+        )
     return VerificationResult(
         verified=True, confidence=0.5, needs_review=True,
         llm_signal=llm, cv_signal=cv, badge_bbox=badge_bbox,

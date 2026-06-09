@@ -4,8 +4,11 @@
 // badge stays clearly legible at 1600px, and the backend further downscales the copy it sends to
 // the LLM, so this does not hurt detection.
 
-const MAX_DIM = 1600;                 // longest edge after downscale
-const QUALITY = 0.85;                 // JPEG quality
+// 2400/q92: keeps files small (a few hundred KB) AND preserves enough badge detail for the CV
+// template match. 1600/q85 shrank the badge so much that CV missed ~1/3 of real badges, forcing
+// genuinely-verified accounts into review. Validated on the labeled set (see verify/classification).
+const MAX_DIM = 2400;                 // longest edge after downscale
+const QUALITY = 0.92;                 // JPEG quality
 const SKIP_UNDER_BYTES = 600 * 1024;  // already small & no downscale needed -> leave as-is
 
 export async function compressImage(file: File): Promise<File> {
