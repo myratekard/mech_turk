@@ -24,12 +24,12 @@ const steps = [
   {
     number: "01",
     icon: ShieldCheck,
-    title: "Find a verified creator",
+    title: "Find a verified account",
     color: "text-primary",
     bg: "bg-primary/10",
     border: "border-primary/20",
     description:
-      "On Instagram, X (Twitter) or TikTok, find a creator of African descent who has the official verified badge next to their name. That badge is what we're collecting.",
+      "On Instagram, X (Twitter) or TikTok, find a creator, influencer or celebrity of African descent who has the official verified badge next to their name. That badge is what we're collecting.",
   },
   {
     number: "02",
@@ -90,9 +90,9 @@ export default function Instructions() {
           <h1 className="text-3xl font-black uppercase tracking-tight mb-2">What To Do</h1>
           <p className="text-muted-foreground font-medium leading-relaxed">
             TURK is building a directory of <span className="text-foreground font-semibold">verified social
-            accounts of African-descent creators</span>. Your task is simple: find a verified creator on
-            Instagram, X or TikTok, screenshot their profile on your phone, and upload it here — you earn
-            points for every new verified account you add.
+            accounts of African-descent creators, influencers and celebrities</span>. Your task is simple: find a
+            verified creator, influencer or celebrity on Instagram, X or TikTok, screenshot their profile on your
+            phone, and upload it here — you earn points for every new verified account you add.
           </p>
         </div>
 
@@ -113,7 +113,7 @@ export default function Instructions() {
                 Upload <span className="text-foreground font-semibold">screenshots taken on your mobile phone</span> of
                 the full profile page — the display name, @handle and the official verified badge must all be visible and
                 uncropped. We're building a directory of <span className="text-foreground font-semibold">verified
-                accounts of African-descent creators</span>, so please submit those. Desktop or web captures, photos of a
+                accounts of African-descent creators, influencers and celebrities</span>, so please submit those. Desktop or web captures, photos of a
                 screen, and edited or cropped images are not accepted.
               </p>
             </div>

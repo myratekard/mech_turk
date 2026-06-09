@@ -7,7 +7,7 @@ export default function Landing() {
   const [, setLocation] = useLocation();
 
   const features = [
-    { icon: ShieldCheck, title: "Verified creators", desc: "We collect accounts carrying the official verified badge, belonging to creators of African descent." },
+    { icon: ShieldCheck, title: "Verified creators", desc: "We collect accounts carrying the official verified badge, belonging to creators, influencers and celebrities of African descent." },
     { icon: UploadCloud, title: "Snap & upload", desc: "Screenshot a verified profile on your phone and drop it in. Each one is checked and added in seconds." },
     { icon: BarChart3, title: "Earn & track", desc: "Every new verified account you add earns points. Watch your total climb on your dashboard and the leaderboard." },
   ];
@@ -40,8 +40,8 @@ export default function Landing() {
           </h1>
           <p className="text-muted-foreground text-lg max-w-2xl mx-auto mb-4 leading-relaxed">
             TURK is a community directory of <span className="text-foreground font-semibold">verified social
-            accounts of African-descent creators</span>. Find a verified creator on Instagram, X or TikTok,
-            screenshot their profile on your phone, and upload it.
+            accounts of African-descent creators, influencers and celebrities</span>. Find a verified creator,
+            influencer or celebrity on Instagram, X or TikTok, screenshot their profile on your phone, and upload it.
           </p>
           <p className="text-muted-foreground text-sm max-w-2xl mx-auto mb-10">
             You earn points for every verified account you contribute — no fakes, no duplicates, just real verified profiles.

@@ -299,7 +299,7 @@ export default function Upload() {
           <h1 className="text-3xl font-black uppercase tracking-tight">Upload Screenshots</h1>
           <p className="text-muted-foreground font-medium">
             Upload mobile screenshots of <span className="text-foreground font-semibold">verified accounts of
-            African-descent creators</span> to process and earn points.
+            African-descent creators, influencers and celebrities</span> to process and earn points.
           </p>
         </div>
 
