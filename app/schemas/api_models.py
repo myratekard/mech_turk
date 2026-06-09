@@ -10,7 +10,7 @@ from typing import List, Literal, Optional
 from pydantic import BaseModel
 
 SubmissionStatus = Literal[
-    "in_review", "processed", "accepted", "invalid", "duplicate", "unsupported"
+    "queued", "processing", "in_review", "processed", "accepted", "invalid", "duplicate", "unsupported"
 ]
 
 

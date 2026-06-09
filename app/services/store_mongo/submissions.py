@@ -8,7 +8,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import List, Optional, Tuple
 
-from pymongo import ASCENDING, DESCENDING
+from pymongo import ASCENDING, DESCENDING, ReturnDocument
 
 from app.core.config import settings
 from app.services.mongo_client import clean, col, db, next_id
@@ -182,18 +182,24 @@ def count_user_uploads_since(user_id: str, since_iso: str) -> int:
     return int(_c().count_documents({"user_id": user_id, "created_at": {"$gte": since_iso}}))
 
 
-def find_exact_hash_match(content_hash: str) -> Optional[dict]:
+def find_exact_hash_match(content_hash: str, exclude_id: Optional[int] = None) -> Optional[dict]:
     """O(1) indexed lookup for a TRUE re-upload (identical bytes); most recent match or None."""
     if not content_hash:
         return None
-    return _c().find_one({"content_hash": content_hash}, {"_id": 0}, sort=[("id", DESCENDING)])
+    q: dict = {"content_hash": content_hash}
+    if exclude_id is not None:
+        q["id"] = {"$ne": exclude_id}
+    return _c().find_one(q, {"_id": 0}, sort=[("id", DESCENDING)])
 
 
-def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000) -> Optional[dict]:
+def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000, exclude_id: Optional[int] = None) -> Optional[dict]:
     if not image_hash:
         return None
     from app.services.imagehash import hamming
-    rows = _c().find({"image_hash": {"$ne": None}}, {"_id": 0}).sort("id", DESCENDING).limit(limit)
+    q: dict = {"image_hash": {"$ne": None}}
+    if exclude_id is not None:
+        q["id"] = {"$ne": exclude_id}
+    rows = _c().find(q, {"_id": 0}).sort("id", DESCENDING).limit(limit)
     best, best_d = None, max_distance + 1
     for r in rows:
         d = hamming(image_hash, r["image_hash"])
@@ -245,6 +251,8 @@ def update_submission_status(
     submission_id: int, status: str, points: int, analysis_json: Optional[str] = None,
     acct_platform: Optional[str] = None, acct_handle: Optional[str] = None,
     update_acct: bool = False, dup_kind: Optional[str] = None,
+    platform: Optional[str] = None, image_hash: Optional[str] = None,
+    content_hash: Optional[str] = None,
 ) -> Optional[dict]:
     sets: dict = {"status": status, "points": points, "updated_at": _now()}
     if analysis_json is not None:
@@ -254,8 +262,45 @@ def update_submission_status(
         sets["acct_handle"] = acct_handle
     if dup_kind is not None:
         sets["dup_kind"] = dup_kind
+    if platform is not None:
+        sets["platform"] = platform
+    if image_hash is not None:
+        sets["image_hash"] = image_hash
+    if content_hash is not None:
+        sets["content_hash"] = content_hash
     _c().update_one({"id": submission_id}, {"$set": sets})
     return _c().find_one({"id": submission_id}, {"_id": 0})
+
+
+# ---------------------------------------------------------- async queue (worker)
+def claim_next_queued(worker_id: str) -> Optional[dict]:
+    """Atomically claim the oldest 'queued' submission -> 'processing'. Returns it, or None."""
+    return _c().find_one_and_update(
+        {"status": "queued"},
+        {"$set": {"status": "processing", "worker_id": worker_id, "started_at": _now()},
+         "$inc": {"attempts": 1}},
+        sort=[("id", ASCENDING)],
+        return_document=ReturnDocument.AFTER,
+        projection={"_id": 0},
+    )
+
+
+def requeue_stale(stale_before_iso: str, max_attempts: int) -> tuple[int, int]:
+    """Recover crashed work: items 'processing' since before stale_before_iso are requeued; those
+    that already burned max_attempts are parked as 'in_review'. Returns (requeued, parked)."""
+    parked = _c().update_many(
+        {"status": "processing", "started_at": {"$lt": stale_before_iso}, "attempts": {"$gte": max_attempts}},
+        {"$set": {"status": "in_review", "worker_id": None, "updated_at": _now()}},
+    )
+    requeued = _c().update_many(
+        {"status": "processing", "started_at": {"$lt": stale_before_iso}, "attempts": {"$lt": max_attempts}},
+        {"$set": {"status": "queued", "worker_id": None, "updated_at": _now()}},
+    )
+    return int(requeued.modified_count), int(parked.modified_count)
+
+
+def count_by_status(status: str) -> int:
+    return int(_c().count_documents({"status": status}))
 
 
 def dispute_submission(user_id: str, submission_id: int) -> Tuple[Optional[dict], Optional[str]]:

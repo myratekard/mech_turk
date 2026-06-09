@@ -33,67 +33,12 @@ from app.services.pipeline import analyze as run_pipeline
 
 router = APIRouter()
 
-_PLATFORM_LABEL = {"instagram": "Instagram", "x": "X", "tiktok": "TikTok", "unknown": "Unknown"}
-
-
-def map_status_points(result) -> tuple[str, int]:
-    """Engine verdict -> (submission status, points). Shared with admin re-run.
-
-      not a profile shot -> unsupported (out of scope; not a profile page)
-      verified           -> accepted (+points)
-      low-confidence      -> in_review (needs a human look)
-      not a verified acct -> invalid (rejected; we only want verified accounts)
-    """
-    if not getattr(result, "is_profile_screenshot", True):
-        return "unsupported", 0
-    v = result.verification
-    if v.needs_review:
-        return "in_review", 0
-    if v.verified:
-        return "accepted", settings.points_accepted
-    return "invalid", 0
-
-
-def apply_african_gate(result, status: str, points: int) -> tuple[str, int]:
-    """African is a deciding factor: only gate a would-be ACCEPT (verified) submission.
-
-      african     (conf >= min) -> stays accepted (eligible)
-      non_african (conf >= min) -> invalid (ineligible — disputable)
-      generic / unclear / low-confidence -> in_review (human decides; low-conf routes here)
-    Other statuses (unsupported / invalid / already in_review) are left untouched.
-    """
-    if status != "accepted" or not settings.african_gate_enabled:
-        return status, points
-    cls = result.african_classification
-    conf = result.african_confidence or 0.0
-    if cls == "african" and conf >= settings.african_conf_min:
-        return "accepted", points
-    if cls == "non_african" and conf >= settings.african_conf_min:
-        return "invalid", 0
-    return "in_review", 0
-
-
-def platform_label(result) -> str:
-    return _PLATFORM_LABEL.get(result.platform, "Unknown")
-
-
-def regular_duplicate_points(user_id) -> int:
-    """Regular-duplicate penalty: points_duplicate (-2) by default, escalating to
-    points_duplicate_escalated (-5) once the user passes duplicate_escalate_threshold
-    regular duplicates."""
-    if submissions_db.count_user_regular_duplicates(str(user_id)) >= settings.duplicate_escalate_threshold:
-        return settings.points_duplicate_escalated
-    return settings.points_duplicate
-
-
-def self_duplicate_points(user_id) -> int:
-    """Escalating self-duplicate penalty: first N = warning (0), next M = mid penalty, then -10."""
-    n = submissions_db.count_user_self_duplicates(str(user_id))
-    if n < settings.self_dup_warn_count:
-        return 0
-    if n < settings.self_dup_warn_count + settings.self_dup_mid_count:
-        return settings.self_dup_mid_penalty
-    return settings.points_self_duplicate
+# Verdict helpers live in app/services/processing.py (shared by the sync path and the async
+# worker). Re-exported here so existing imports (e.g. admin re-run) keep working.
+from app.services.processing import (  # noqa: E402
+    map_status_points, apply_african_gate, platform_label,
+    regular_duplicate_points, self_duplicate_points,
+)
 
 
 # --------------------------------------------------------------------------- health
@@ -232,6 +177,19 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
     if submissions_db.count_user_uploads_since(uid, since) >= settings.daily_upload_limit:
         raise HTTPException(status_code=429, detail="Daily upload limit reached. Try again later.")
+
+    # ASYNC MODE: store as 'queued' and return instantly; the background worker runs the full
+    # pipeline (gate + dedup + LLM/CV + African gate) and updates the verdict. Keeps ingest fast
+    # and resilient. (Off => the legacy synchronous path below.)
+    if settings.async_processing:
+        row = submissions_db.insert_submission(
+            user_id=uid, org_id=user.get("org_id"), image_url=body.imageUrl,
+            object_path=body.objectPath, file_name=body.fileName,
+            platform=body.platform, status="queued", points=0, analysis_json=None,
+            content_hash=content_hash,
+        )
+        print(f"[ingest] submission #{row['id']} queued (async)", flush=True)
+        return _row_to_submission(row)
 
     # 1b) Cheap shape gate: reject obvious non-phone-screenshots before spending an LLM call.
     reason = image_gate.check_phone_screenshot(data)

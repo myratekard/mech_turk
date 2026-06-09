@@ -66,6 +66,14 @@ class Settings:
     # Tuned on the labeled set: 0.7 yields ~10% review, 0 false-accepts (see verify/classification).
     african_gate_enabled: bool = os.getenv("AFRICAN_GATE_ENABLED", "true").lower() == "true"
     african_conf_min: float = float(os.getenv("AFRICAN_CONF_MIN", "0.7"))
+
+    # --- Async processing (background worker) ---
+    # When on, uploads are stored as 'queued' and returned instantly; a separate worker runs the
+    # pipeline and updates the verdict. Off = legacy synchronous processing in the request.
+    async_processing: bool = os.getenv("ASYNC_PROCESSING", "false").lower() == "true"
+    worker_poll_seconds: float = float(os.getenv("WORKER_POLL_SECONDS", "2"))   # idle poll interval
+    worker_stale_seconds: int = int(os.getenv("WORKER_STALE_SECONDS", "300"))   # requeue items stuck 'processing'
+    worker_max_attempts: int = int(os.getenv("WORKER_MAX_ATTEMPTS", "3"))       # before parking as in_review
     points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "-2"))          # regular duplicate, first tier (penalty)
     points_self_duplicate: int = int(os.getenv("POINTS_SELF_DUPLICATE", "-10"))  # self re-upload, final tier (penalty)
     # After a user racks up this many regular duplicates, the penalty escalates (to -5).

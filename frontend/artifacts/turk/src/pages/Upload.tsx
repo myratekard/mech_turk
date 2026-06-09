@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { compressImage } from "@/lib/compressImage";
 
 // Per-upload verdict returned by the backend, with its display treatment.
-type Verdict = "accepted" | "in_review" | "duplicate" | "invalid" | "unsupported";
+type Verdict = "accepted" | "in_review" | "duplicate" | "invalid" | "unsupported" | "queued" | "processing";
 
 const VERDICT: Record<Verdict, { label: string; Icon: any; text: string; ring: string }> = {
   accepted:    { label: "Accepted",    Icon: CheckCircle2, text: "text-green-500",   ring: "border-green-500/50 shadow-[0_0_22px_rgba(34,197,94,0.30)]" },
@@ -19,6 +19,10 @@ const VERDICT: Record<Verdict, { label: string; Icon: any; text: string; ring: s
   duplicate:   { label: "Duplicate",   Icon: Copy,         text: "text-fuchsia-500", ring: "border-fuchsia-500/50 shadow-[0_0_22px_rgba(217,70,239,0.30)]" },
   invalid:     { label: "Invalid",     Icon: XCircle,      text: "text-red-500",     ring: "border-red-500/50 shadow-[0_0_22px_rgba(239,68,68,0.30)]" },
   unsupported: { label: "Unsupported", Icon: ImageOff,     text: "text-slate-400",   ring: "border-slate-500/50 shadow-[0_0_22px_rgba(100,116,139,0.30)]" },
+  // Async mode: upload returns instantly as queued; the worker computes the real verdict, which
+  // the dashboard/submissions list pick up. Shown as a neutral "Uploaded" pulse (no confetti).
+  queued:      { label: "Uploaded",    Icon: Clock,        text: "text-primary",     ring: "border-primary/50 shadow-[0_0_22px_rgba(0,255,255,0.25)]" },
+  processing:  { label: "Processing",  Icon: Clock,        text: "text-primary",     ring: "border-primary/50 shadow-[0_0_22px_rgba(0,255,255,0.25)]" },
 };
 
 const CONFETTI_COLORS = [

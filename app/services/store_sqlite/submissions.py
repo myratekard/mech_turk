@@ -71,6 +71,13 @@ def init_db() -> None:
             conn.execute("ALTER TABLE submissions ADD COLUMN dup_kind TEXT")  # 'self' | 'regular' | null
         if "content_hash" not in cols:
             conn.execute("ALTER TABLE submissions ADD COLUMN content_hash TEXT")  # sha256 of raw bytes
+        # Async-queue bookkeeping (background worker): claim/attempt/recovery.
+        if "started_at" not in cols:
+            conn.execute("ALTER TABLE submissions ADD COLUMN started_at TEXT")
+        if "worker_id" not in cols:
+            conn.execute("ALTER TABLE submissions ADD COLUMN worker_id TEXT")
+        if "attempts" not in cols:
+            conn.execute("ALTER TABLE submissions ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0")
         # Indexed exact-content lookup → O(1) detection of true re-uploads (no Hamming scan).
         conn.execute("CREATE INDEX IF NOT EXISTS idx_sub_content_hash ON submissions(content_hash)")
         conn.execute(
@@ -257,28 +264,33 @@ def count_user_uploads_since(user_id: str, since_iso: str) -> int:
         ).fetchone()["c"])
 
 
-def find_exact_hash_match(content_hash: str) -> Optional[dict]:
+def find_exact_hash_match(content_hash: str, exclude_id: Optional[int] = None) -> Optional[dict]:
     """O(1) indexed lookup for a TRUE re-upload (identical bytes). Returns the most recent
     prior submission with this sha256, or None. Checked before the fuzzy Hamming scan."""
     if not content_hash:
         return None
+    where, params = "content_hash = ?", [content_hash]
+    if exclude_id is not None:
+        where += " AND id != ?"; params.append(exclude_id)
     with _connect() as conn:
         row = conn.execute(
-            "SELECT * FROM submissions WHERE content_hash = ? ORDER BY id DESC LIMIT 1",
-            (content_hash,),
+            f"SELECT * FROM submissions WHERE {where} ORDER BY id DESC LIMIT 1", params,
         ).fetchone()
     return dict(row) if row else None
 
 
-def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000) -> Optional[dict]:
+def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000, exclude_id: Optional[int] = None) -> Optional[dict]:
     """Nearest prior submission within max_distance bits (most recent first). None if no image_hash."""
     if not image_hash:
         return None
     from app.services.imagehash import hamming
+    where, params = "image_hash IS NOT NULL", []
+    if exclude_id is not None:
+        where += " AND id != ?"; params.append(exclude_id)
+    params.append(limit)
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT * FROM submissions WHERE image_hash IS NOT NULL ORDER BY id DESC LIMIT ?",
-            (limit,),
+            f"SELECT * FROM submissions WHERE {where} ORDER BY id DESC LIMIT ?", params,
         ).fetchall()
     best, best_d = None, max_distance + 1
     for r in rows:
@@ -342,6 +354,8 @@ def update_submission_status(
     submission_id: int, status: str, points: int, analysis_json: Optional[str] = None,
     acct_platform: Optional[str] = None, acct_handle: Optional[str] = None,
     update_acct: bool = False, dup_kind: Optional[str] = None,
+    platform: Optional[str] = None, image_hash: Optional[str] = None,
+    content_hash: Optional[str] = None,
 ) -> Optional[dict]:
     sets = ["status=?", "points=?", "updated_at=?"]
     params: list = [status, points, _now()]
@@ -354,11 +368,57 @@ def update_submission_status(
     if dup_kind is not None:
         sets.append("dup_kind=?")
         params.append(dup_kind)
+    if platform is not None:
+        sets.append("platform=?"); params.append(platform)
+    if image_hash is not None:
+        sets.append("image_hash=?"); params.append(image_hash)
+    if content_hash is not None:
+        sets.append("content_hash=?"); params.append(content_hash)
     params.append(submission_id)
     with _connect() as conn:
         conn.execute(f"UPDATE submissions SET {', '.join(sets)} WHERE id=?", params)
         row = conn.execute("SELECT * FROM submissions WHERE id=?", (submission_id,)).fetchone()
     return dict(row) if row else None
+
+
+# ---------------------------------------------------------- async queue (worker)
+def claim_next_queued(worker_id: str) -> Optional[dict]:
+    """Atomically claim the oldest 'queued' submission -> 'processing'. Returns it, or None.
+    SQLite has a single writer, so the UPDATE...WHERE id=(SELECT...) claim is atomic."""
+    with _connect() as conn:
+        cur = conn.execute(
+            "UPDATE submissions SET status='processing', worker_id=?, started_at=?, attempts=attempts+1 "
+            "WHERE id = (SELECT id FROM submissions WHERE status='queued' ORDER BY id ASC LIMIT 1)",
+            (worker_id, _now()),
+        )
+        if cur.rowcount == 0:
+            return None
+        row = conn.execute(
+            "SELECT * FROM submissions WHERE status='processing' AND worker_id=? ORDER BY started_at DESC LIMIT 1",
+            (worker_id,),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def requeue_stale(stale_before_iso: str, max_attempts: int) -> tuple[int, int]:
+    """Requeue items stuck in 'processing'; park over-attempts as 'in_review'. Returns (requeued, parked)."""
+    with _connect() as conn:
+        parked = conn.execute(
+            "UPDATE submissions SET status='in_review', worker_id=NULL, updated_at=? "
+            "WHERE status='processing' AND started_at < ? AND attempts >= ?",
+            (_now(), stale_before_iso, max_attempts),
+        ).rowcount
+        requeued = conn.execute(
+            "UPDATE submissions SET status='queued', worker_id=NULL, updated_at=? "
+            "WHERE status='processing' AND started_at < ? AND attempts < ?",
+            (_now(), stale_before_iso, max_attempts),
+        ).rowcount
+    return int(requeued), int(parked)
+
+
+def count_by_status(status: str) -> int:
+    with _connect() as conn:
+        return int(conn.execute("SELECT COUNT(*) c FROM submissions WHERE status=?", (status,)).fetchone()["c"])
 
 
 # Final states an uploader may contest into the review queue.

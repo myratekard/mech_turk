@@ -24,6 +24,8 @@ export default function Dashboard() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case "accepted": return "bg-green-500/10 text-green-500 border-green-500/20";
+      case "queued":
+      case "processing": return "bg-primary/10 text-primary border-primary/20";
       case "in_review": return "bg-amber-500/10 text-amber-500 border-amber-500/20";
       case "invalid": return "bg-red-500/10 text-red-500 border-red-500/20";
       case "duplicate": return "bg-fuchsia-500/10 text-fuchsia-500 border-fuchsia-500/20";
