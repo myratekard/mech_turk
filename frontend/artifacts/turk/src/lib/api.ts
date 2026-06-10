@@ -56,6 +56,7 @@ export interface Analytics {
   inReview: number;
   duplicate?: number;
   unsupported?: number;
+  processing?: number;       // queued + processing (background worker)
   totalPoints: number;
   settledPoints?: number;
   unsettledPoints?: number;
@@ -71,6 +72,7 @@ export interface UserStat {
   inReview: number;
   duplicate: number;
   unsupported: number;
+  processing: number;        // queued + processing (background worker)
   points: number;
 }
 export interface Org {

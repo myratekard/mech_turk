@@ -130,6 +130,7 @@ def analytics(org_id: Optional[int] = None) -> dict:
         "inReview": sum(1 for r in rows if r["status"] == "in_review"),
         "duplicate": sum(1 for r in rows if r["status"] == "duplicate"),
         "unsupported": sum(1 for r in rows if r["status"] == "unsupported"),
+        "processing": sum(1 for r in rows if r["status"] in ("queued", "processing")),
         "totalPoints": total_points,
         "settledPoints": settled_points,
         "unsettledPoints": total_points - settled_points,
@@ -152,6 +153,7 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
             "in_review": _sum_if("in_review"),
             "duplicate": _sum_if("duplicate"),
             "unsupported": _sum_if("unsupported"),
+            "processing": {"$sum": {"$cond": [{"$in": ["$status", ["queued", "processing"]]}, 1, 0]}},
             "points": {"$sum": "$points"},
         }},
     ]
@@ -161,6 +163,7 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
             "user_id": r["_id"], "total": r["total"], "accepted": r["accepted"] or 0,
             "invalid": r["invalid"] or 0, "in_review": r["in_review"] or 0,
             "duplicate": r["duplicate"] or 0, "unsupported": r["unsupported"] or 0,
+            "processing": r.get("processing") or 0,
             "points": r["points"] or 0,
         })
     return out
@@ -322,7 +325,10 @@ def list_submissions(
     user_id: str, status: Optional[str], page: int, limit: int
 ) -> Tuple[List[dict], int]:
     q: dict = {"user_id": user_id}
-    if status:
+    if status == "processing":
+        # The UI's "Processing" bucket spans both async-queue states.
+        q["status"] = {"$in": ["queued", "processing"]}
+    elif status:
         q["status"] = status
     c = _c()
     total = c.count_documents(q)
@@ -340,7 +346,9 @@ def list_all_submissions(
     if user_ids is not None and not user_ids:
         return [], 0  # a user filter that matched nobody
     q: dict = {}
-    if status:
+    if status == "processing":
+        q["status"] = {"$in": ["queued", "processing"]}
+    elif status:
         q["status"] = status
     if org_id:
         q["org_id"] = org_id
@@ -384,6 +392,7 @@ def dashboard_summary(user_id: str) -> dict:
     invalid = sum(1 for r in rows if r["status"] == "invalid")
     duplicate = sum(1 for r in rows if r["status"] == "duplicate")
     unsupported = sum(1 for r in rows if r["status"] == "unsupported")
+    processing = sum(1 for r in rows if r["status"] in ("queued", "processing"))
     updated_today = sum(1 for r in rows if (r.get("updated_at") or "").startswith(today))
 
     accepted_pts = sum(r.get("points", 0) for r in rows if r["status"] == "accepted")
@@ -391,6 +400,7 @@ def dashboard_summary(user_id: str) -> dict:
     points_breakdown = [
         {"key": "accepted", "label": "Accepted captures", "count": accepted, "points": accepted_pts},
         {"key": "duplicate", "label": "Duplicate penalties", "count": duplicate, "points": duplicate_pts},
+        {"key": "processing", "label": "Processing", "count": processing, "points": 0},
         {"key": "in_review", "label": "Pending review", "count": in_review, "points": 0},
         {"key": "invalid", "label": "Rejected / invalid", "count": invalid, "points": 0},
         {"key": "unsupported", "label": "Unsupported", "count": unsupported, "points": 0},
@@ -408,6 +418,7 @@ def dashboard_summary(user_id: str) -> dict:
         "invalid": invalid,
         "duplicate": duplicate,
         "unsupported": unsupported,
+        "processing": processing,
         "updatedToday": updated_today,
         "pointsBreakdown": points_breakdown,
     }

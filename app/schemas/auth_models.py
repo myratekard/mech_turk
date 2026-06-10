@@ -47,6 +47,7 @@ class OrgAnalytics(BaseModel):
     inReview: int
     duplicate: int = 0
     unsupported: int = 0
+    processing: int = 0        # queued + processing (in the background worker)
     totalPoints: int
     settledPoints: int = 0
     unsettledPoints: int = 0
@@ -62,6 +63,7 @@ class UserStat(BaseModel):
     inReview: int
     duplicate: int
     unsupported: int = 0
+    processing: int = 0
     points: int
 
 

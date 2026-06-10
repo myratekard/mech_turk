@@ -7,7 +7,7 @@ import {
 } from "@workspace/api-client-react";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { Zap, CheckCircle2, Clock, Activity, BarChart3, XCircle, Copy, ImageOff, UploadCloud, Wallet } from "lucide-react";
+import { Zap, CheckCircle2, Clock, Activity, BarChart3, XCircle, Copy, ImageOff, UploadCloud, Wallet, Loader2 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -87,12 +87,19 @@ export default function Dashboard() {
             color="text-green-500" 
             loading={isSummaryLoading} 
           />
-          <StatCard 
-            title="In Review" 
-            value={summary?.inReview} 
-            icon={Clock} 
-            color="text-amber-500" 
-            loading={isSummaryLoading} 
+          <StatCard
+            title="In Review"
+            value={summary?.inReview}
+            icon={Clock}
+            color="text-amber-500"
+            loading={isSummaryLoading}
+          />
+          <StatCard
+            title="Processing"
+            value={(summary as any)?.processing}
+            icon={Loader2}
+            color="text-primary"
+            loading={isSummaryLoading}
           />
           <StatCard
             title="Invalid"

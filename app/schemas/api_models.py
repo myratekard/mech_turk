@@ -74,6 +74,7 @@ class DashboardSummary(BaseModel):
     invalid: int
     duplicate: int = 0
     unsupported: int = 0
+    processing: int = 0        # queued + processing (background worker)
     updatedToday: int
     pointsBreakdown: List[PointsBreakdownEntry] = []
 

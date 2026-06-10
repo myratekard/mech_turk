@@ -400,7 +400,7 @@ def analytics_per_user(user: dict = Depends(_analytics_roles)):
             username=u["username"] if u else f"user:{s['user_id']}",
             total=s["total"], accepted=s["accepted"], invalid=s["invalid"],
             inReview=s["in_review"], duplicate=s["duplicate"],
-            unsupported=s["unsupported"], points=s["points"],
+            unsupported=s["unsupported"], processing=s.get("processing", 0), points=s["points"],
         ))
     out.sort(key=lambda x: x.total, reverse=True)
     return out

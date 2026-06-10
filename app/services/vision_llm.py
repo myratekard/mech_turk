@@ -83,25 +83,47 @@ _SYSTEM = (
 
 
 @lru_cache(maxsize=1)
-def _structured_model():
-    model = ChatGoogleGenerativeAI(
+def _rate_limiter():
+    """Shared, process-wide token bucket so the worker pool can't burst past Gemini's
+    per-minute quota (the cause of the 429 -> long-backoff latency tail under load).
+    Returns None when LLM_RATE_LIMIT_RPS<=0 (disabled)."""
+    rps = settings.llm_rate_limit_rps
+    if rps <= 0:
+        return None
+    from langchain_core.rate_limiters import InMemoryRateLimiter
+    return InMemoryRateLimiter(
+        requests_per_second=rps,
+        check_every_n_seconds=0.1,
+        max_bucket_size=max(1.0, rps),  # allow a small burst up to ~1s worth of calls
+    )
+
+
+def _base_model() -> ChatGoogleGenerativeAI:
+    # max_retries + timeout BOUND the tail: a throttled call fails fast (-> in_review) instead
+    # of the client's default 6-retry exponential backoff stacking to minutes.
+    kwargs = dict(
         model=settings.gemini_model,
         temperature=0,
         google_api_key=settings.google_api_key or None,
         thinking_budget=settings.gemini_thinking_budget,  # 0 = no thinking tokens (cheaper)
+        max_retries=settings.llm_max_retries,
     )
-    return model.with_structured_output(VisionAnalysis)
+    if settings.llm_timeout_seconds > 0:
+        kwargs["timeout"] = settings.llm_timeout_seconds
+    rl = _rate_limiter()
+    if rl is not None:
+        kwargs["rate_limiter"] = rl
+    return ChatGoogleGenerativeAI(**kwargs)
+
+
+@lru_cache(maxsize=1)
+def _structured_model():
+    return _base_model().with_structured_output(VisionAnalysis)
 
 
 @lru_cache(maxsize=1)
 def _receipt_model():
-    model = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        temperature=0,
-        google_api_key=settings.google_api_key or None,
-        thinking_budget=settings.gemini_thinking_budget,
-    )
-    return model.with_structured_output(ReceiptAnalysis)
+    return _base_model().with_structured_output(ReceiptAnalysis)
 
 
 _RECEIPT_SYSTEM = (
