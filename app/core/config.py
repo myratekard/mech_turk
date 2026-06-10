@@ -74,6 +74,10 @@ class Settings:
     worker_poll_seconds: float = float(os.getenv("WORKER_POLL_SECONDS", "2"))   # idle poll interval
     worker_stale_seconds: int = int(os.getenv("WORKER_STALE_SECONDS", "300"))   # requeue items stuck 'processing'
     worker_max_attempts: int = int(os.getenv("WORKER_MAX_ATTEMPTS", "3"))       # before parking as in_review
+    # How many submissions one worker processes at once. The Gemini call is mostly network wait,
+    # so overlapping a handful greatly raises throughput. Clamped to [1,10]; atomic claims keep
+    # the concurrent workers from grabbing the same item.
+    worker_concurrency: int = int(os.getenv("WORKER_CONCURRENCY", "8"))
     points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "-2"))          # regular duplicate, first tier (penalty)
     points_self_duplicate: int = int(os.getenv("POINTS_SELF_DUPLICATE", "-10"))  # self re-upload, final tier (penalty)
     # After a user racks up this many regular duplicates, the penalty escalates (to -5).

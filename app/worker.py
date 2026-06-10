@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import os
 import socket
+import threading
 import time
 from datetime import datetime, timedelta, timezone
 
@@ -13,6 +14,7 @@ from app.services import submissions_db
 from app.services.processing import process_submission
 
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
+_stop = threading.Event()
 
 
 def _stale_cutoff_iso() -> str:
@@ -28,11 +30,9 @@ def _reap() -> None:
         print(f"[worker] reaper error: {e}", flush=True)
 
 
-def _process_one() -> bool:
-    """Claim and process one queued item. Returns True if one was handled, False if queue empty."""
-    row = submissions_db.claim_next_queued(WORKER_ID)
-    if not row:
-        return False
+def _handle(row: dict) -> None:
+    """Process one claimed row and persist the verdict. Never raises (the reaper recovers
+    anything left in 'processing')."""
     sid = row["id"]
     t0 = time.monotonic()
     try:
@@ -47,10 +47,24 @@ def _process_one() -> bool:
         )
         print(f"[worker] #{sid} -> {res['status']} ({res['points']}) in {(time.monotonic()-t0)*1000:.0f}ms", flush=True)
     except Exception as e:
-        # Leave it 'processing'; the reaper will requeue it (attempts++ already happened at claim)
-        # or park it as in_review once it has burned max_attempts. Never crashes the loop.
+        # Leave it 'processing'; the reaper requeues it (attempts++ happened at claim) or parks it
+        # as in_review once it burns max_attempts. Never crashes the worker thread.
         print(f"[worker] #{sid} FAILED (attempt {row.get('attempts')}): {e}", flush=True)
-    return True
+
+
+def _worker_thread(name: str) -> None:
+    """One concurrent worker: claim (atomic) -> process -> repeat. Idle-polls when the queue is empty."""
+    while not _stop.is_set():
+        try:
+            row = submissions_db.claim_next_queued(name)
+        except Exception as e:
+            print(f"[worker] {name} claim error: {e}", flush=True)
+            _stop.wait(settings.worker_poll_seconds)
+            continue
+        if not row:
+            _stop.wait(settings.worker_poll_seconds)
+            continue
+        _handle(row)
 
 
 def run() -> None:
@@ -58,22 +72,17 @@ def run() -> None:
         submissions_db.init_db()
     except Exception:
         pass
-    print(f"[worker] started {WORKER_ID} | poll={settings.worker_poll_seconds}s "
+    n = max(1, min(10, settings.worker_concurrency))   # cap concurrency at 10
+    print(f"[worker] started {WORKER_ID} | concurrency={n} poll={settings.worker_poll_seconds}s "
           f"stale={settings.worker_stale_seconds}s max_attempts={settings.worker_max_attempts}", flush=True)
     _reap()  # recover anything left 'processing' by a previous crash/deploy
-    last_reap = time.monotonic()
+    for i in range(n):
+        threading.Thread(target=_worker_thread, args=(f"{WORKER_ID}#{i}",), daemon=True, name=f"w{i}").start()
+    # Main thread: periodic reaper.
     reap_every = min(settings.worker_stale_seconds, 60)
-    while True:
-        if time.monotonic() - last_reap >= reap_every:
-            _reap()
-            last_reap = time.monotonic()
-        try:
-            handled = _process_one()
-        except Exception as e:
-            print(f"[worker] loop error: {e}", flush=True)
-            handled = False
-        if not handled:
-            time.sleep(settings.worker_poll_seconds)
+    while not _stop.is_set():
+        time.sleep(reap_every)
+        _reap()
 
 
 if __name__ == "__main__":
