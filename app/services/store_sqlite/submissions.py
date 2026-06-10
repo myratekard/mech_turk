@@ -201,6 +201,7 @@ def analytics(org_id: Optional[int] = None) -> dict:
         "inReview": sum(1 for r in rows if r["status"] == "in_review"),
         "duplicate": sum(1 for r in rows if r["status"] == "duplicate"),
         "unsupported": sum(1 for r in rows if r["status"] == "unsupported"),
+        "processing": sum(1 for r in rows if r["status"] in ("queued", "processing")),
         "totalPoints": total_points,
         "settledPoints": settled_points,
         "unsettledPoints": total_points - settled_points,
@@ -222,6 +223,7 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
                    SUM(status='in_review') AS in_review,
                    SUM(status='duplicate') AS duplicate,
                    SUM(status='unsupported') AS unsupported,
+                   SUM(status IN ('queued','processing')) AS processing,
                    COALESCE(SUM(points),0) AS points
             FROM submissions {where}
             GROUP BY user_id
@@ -233,6 +235,7 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
             "user_id": r["user_id"], "total": r["total"], "accepted": r["accepted"] or 0,
             "invalid": r["invalid"] or 0, "in_review": r["in_review"] or 0,
             "duplicate": r["duplicate"] or 0, "unsupported": r["unsupported"] or 0,
+            "processing": r["processing"] or 0,
             "points": r["points"] or 0,
         }
         for r in rows
@@ -458,7 +461,10 @@ def list_submissions(
 ) -> Tuple[List[dict], int]:
     where = "WHERE user_id = ?"
     params: list = [user_id]
-    if status:
+    if status == "processing":
+        # The UI's "Processing" bucket spans both async-queue states.
+        where += " AND status IN ('queued','processing')"
+    elif status:
         where += " AND status = ?"
         params.append(status)
     offset = (page - 1) * limit
@@ -483,7 +489,9 @@ def list_all_submissions(
     if user_ids is not None and not user_ids:
         return [], 0  # a user filter that matched nobody
     where, params = "WHERE 1=1", []
-    if status:
+    if status == "processing":
+        where += " AND status IN ('queued','processing')"
+    elif status:
         where += " AND status = ?"; params.append(status)
     if org_id:
         where += " AND org_id = ?"; params.append(org_id)
@@ -544,6 +552,7 @@ def dashboard_summary(user_id: str) -> dict:
     invalid = sum(1 for r in rows if r["status"] == "invalid")
     duplicate = sum(1 for r in rows if r["status"] == "duplicate")
     unsupported = sum(1 for r in rows if r["status"] == "unsupported")
+    processing = sum(1 for r in rows if r["status"] in ("queued", "processing"))
     updated_today = sum(1 for r in rows if (r["updated_at"] or "").startswith(today))
 
     # Per-category point makeup — sums straight from each submission's awarded
@@ -554,6 +563,7 @@ def dashboard_summary(user_id: str) -> dict:
     points_breakdown = [
         {"key": "accepted", "label": "Accepted captures", "count": accepted, "points": accepted_pts},
         {"key": "duplicate", "label": "Duplicate penalties", "count": duplicate, "points": duplicate_pts},
+        {"key": "processing", "label": "Processing", "count": processing, "points": 0},
         {"key": "in_review", "label": "Pending review", "count": in_review, "points": 0},
         {"key": "invalid", "label": "Rejected / invalid", "count": invalid, "points": 0},
         {"key": "unsupported", "label": "Unsupported", "count": unsupported, "points": 0},
@@ -572,6 +582,7 @@ def dashboard_summary(user_id: str) -> dict:
         "invalid": invalid,
         "duplicate": duplicate,
         "unsupported": unsupported,
+        "processing": processing,
         "updatedToday": updated_today,
         "pointsBreakdown": points_breakdown,
     }

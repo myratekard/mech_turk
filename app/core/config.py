@@ -14,6 +14,13 @@ class Settings:
     google_api_key: str = os.getenv("GOOGLE_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     llm_max_retries: int = int(os.getenv("LLM_MAX_RETRIES", "2"))   # transient-failure retries
+    # Hard per-call deadline (seconds) for a Gemini invoke. Bounds the tail: under load a
+    # throttled (429) call fails fast and routes to in_review instead of the client's inner
+    # exponential backoff stacking to minutes. 0 disables.
+    llm_timeout_seconds: int = int(os.getenv("LLM_TIMEOUT_SECONDS", "30"))
+    # Client-side request rate cap (requests/sec, shared process-wide) to keep the worker pool
+    # from bursting past Gemini's per-minute quota and tripping 429s. 0 disables.
+    llm_rate_limit_rps: float = float(os.getenv("LLM_RATE_LIMIT_RPS", "0"))
     # Gemini 2.5 "thinking" tokens are billed as output and dominate cost; 0 disables them.
     gemini_thinking_budget: int = int(os.getenv("GEMINI_THINKING_BUDGET", "0"))
 

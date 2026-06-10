@@ -293,7 +293,7 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
 
 @router.get("/submissions", response_model=SubmissionList, tags=["submissions"])
 def list_submissions(
-    status: Optional[str] = Query(default=None, pattern="^(in_review|processed|accepted|invalid)$"),
+    status: Optional[str] = Query(default=None, pattern="^(processing|queued|in_review|processed|accepted|invalid|duplicate|unsupported)$"),
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
     user: dict = Depends(get_current_user),

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/layout/Shell";
 import { api, Analytics as AnalyticsData, UserStat } from "@/lib/api";
-import { BarChart3, Users as UsersIcon, Ban, CheckCircle2, XCircle, Clock, Zap, FileStack, Copy, ImageOff, ArrowUp, ArrowDown, ArrowUpDown, Wallet } from "lucide-react";
+import { BarChart3, Users as UsersIcon, Ban, CheckCircle2, XCircle, Clock, Zap, FileStack, Copy, ImageOff, ArrowUp, ArrowDown, ArrowUpDown, Wallet, Loader2 } from "lucide-react";
 
 function Stat({ title, value, icon: Icon, color }: { title: string; value?: number; icon: any; color: string }) {
   return (
@@ -20,6 +20,7 @@ const METRICS = [
   { key: "accepted", label: "Accepted", color: "bg-green-500" },
   { key: "invalid", label: "Invalid", color: "bg-red-500" },
   { key: "inReview", label: "In Review", color: "bg-amber-500" },
+  { key: "processing", label: "Processing", color: "bg-primary" },
   { key: "duplicate", label: "Duplicate", color: "bg-fuchsia-500" },
   { key: "unsupported", label: "Unsupported", color: "bg-slate-500" },
   { key: "points", label: "Points", color: "bg-primary" },
@@ -36,6 +37,7 @@ const COLUMNS = [
   { key: "accepted", label: "Accepted", numeric: true, cls: "text-green-500" },
   { key: "invalid", label: "Invalid", numeric: true, cls: "text-red-500" },
   { key: "inReview", label: "Review", numeric: true, cls: "text-amber-500" },
+  { key: "processing", label: "Processing", numeric: true, cls: "text-primary" },
   { key: "duplicate", label: "Dup", numeric: true, cls: "text-fuchsia-500" },
   { key: "points", label: "Points", numeric: true, cls: "font-bold text-primary" },
 ] as const;
@@ -119,6 +121,7 @@ export default function Analytics() {
               <Stat title="Accepted" value={data.accepted} icon={CheckCircle2} color="text-green-500" />
               <Stat title="Invalid" value={data.invalid} icon={XCircle} color="text-red-500" />
               <Stat title="In Review" value={data.inReview} icon={Clock} color="text-amber-500" />
+              <Stat title="Processing" value={data.processing} icon={Loader2} color="text-primary" />
               <Stat title="Duplicate" value={data.duplicate} icon={Copy} color="text-fuchsia-500" />
               <Stat title="Unsupported" value={data.unsupported} icon={ImageOff} color="text-slate-500" />
               <Stat title="Users" value={data.users} icon={UsersIcon} color="text-primary" />

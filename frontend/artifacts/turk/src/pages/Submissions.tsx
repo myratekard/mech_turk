@@ -144,6 +144,7 @@ export default function Submissions() {
               <SelectTrigger className="w-[130px] h-8 text-xs border-0 bg-transparent focus:ring-0 shadow-none font-mono"><SelectValue placeholder="All Status" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">ALL STATUS</SelectItem>
+                <SelectItem value="processing">PROCESSING</SelectItem>
                 <SelectItem value="in_review">IN REVIEW</SelectItem>
                 <SelectItem value="accepted">ACCEPTED</SelectItem>
                 <SelectItem value="invalid">INVALID</SelectItem>
