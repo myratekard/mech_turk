@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import concurrent.futures
 import time
 from functools import lru_cache
 
@@ -9,6 +10,29 @@ from langchain_google_genai.chat_models import ChatGoogleGenerativeAI
 
 from app.core.config import settings
 from app.schemas.models import ReceiptAnalysis, VisionAnalysis
+
+# Hard wall-clock bound on a single Gemini invoke. The client's own `timeout`/`max_retries`
+# do NOT control the underlying google-genai SDK's internal 429 retry, so a throttled call
+# can still stack to minutes and monopolize a worker slot. Running invoke() in this pool and
+# waiting with a deadline guarantees the slot is freed on time; the orphaned call (I/O-bound)
+# finishes and its thread exits on its own.
+_LLM_EXEC = concurrent.futures.ThreadPoolExecutor(max_workers=64, thread_name_prefix="llm")
+
+
+class LLMTimeout(Exception):
+    """Raised when a Gemini invoke exceeds llm_timeout_seconds — NOT retried (fail fast)."""
+
+
+def _invoke(model, messages):
+    t = settings.llm_timeout_seconds
+    if t <= 0:
+        return model.invoke(messages)
+    fut = _LLM_EXEC.submit(model.invoke, messages)
+    try:
+        return fut.result(timeout=t)
+    except concurrent.futures.TimeoutError:
+        fut.cancel()  # best-effort; the orphan I/O call exits when the SDK returns
+        raise LLMTimeout(f"Gemini invoke exceeded {t}s")
 
 try:
     from langsmith import traceable
@@ -160,11 +184,15 @@ def analyze_screenshot(image_bytes: bytes, mime: str = "image/jpeg") -> VisionAn
             ]
         ),
     ]
-    # Retry transient Gemini failures (network/quota/5xx) with short backoff.
+    # Retry transient Gemini failures (network/quota/5xx) with short backoff. A hard timeout
+    # (LLMTimeout) is NOT retried — it fails fast so the pipeline routes to in_review and the
+    # worker slot is freed instead of a throttled call stacking to minutes.
     last_err = None
     for attempt in range(settings.llm_max_retries + 1):
         try:
-            return _structured_model().invoke(messages)
+            return _invoke(_structured_model(), messages)
+        except LLMTimeout:
+            raise
         except Exception as e:
             last_err = e
             if attempt < settings.llm_max_retries:
@@ -187,7 +215,9 @@ def extract_receipt_amount(image_bytes: bytes, mime: str = "image/jpeg") -> Rece
     last_err = None
     for attempt in range(settings.llm_max_retries + 1):
         try:
-            return _receipt_model().invoke(messages)
+            return _invoke(_receipt_model(), messages)
+        except LLMTimeout:
+            raise
         except Exception as e:
             last_err = e
             if attempt < settings.llm_max_retries:
