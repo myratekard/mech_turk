@@ -292,27 +292,35 @@ def find_exact_hash_match(content_hash: str, exclude_id: Optional[int] = None) -
     return dict(row) if row else None
 
 
-def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000, exclude_id: Optional[int] = None) -> Optional[dict]:
-    """Nearest prior submission within max_distance bits (most recent first). None if no image_hash."""
+def find_phash_match(image_hash: str, max_distance: int, limit: Optional[int] = None, exclude_id: Optional[int] = None) -> Optional[dict]:
+    """Nearest prior submission within max_distance bits (most recent first). None if no image_hash.
+
+    Two-phase: scan only (id, image_hash) for the recent window, then fetch the one winning row."""
     if not image_hash:
         return None
     from app.services.imagehash import hamming
+    from app.core.config import settings
+    if limit is None:
+        limit = settings.phash_scan_limit
     where, params = "image_hash IS NOT NULL", []
     if exclude_id is not None:
         where += " AND id != ?"; params.append(exclude_id)
     params.append(limit)
     with _connect() as conn:
         rows = conn.execute(
-            f"SELECT * FROM submissions WHERE {where} ORDER BY id DESC LIMIT ?", params,
+            f"SELECT id, image_hash FROM submissions WHERE {where} ORDER BY id DESC LIMIT ?", params,
         ).fetchall()
-    best, best_d = None, max_distance + 1
-    for r in rows:
-        d = hamming(image_hash, r["image_hash"])
-        if d <= max_distance and d < best_d:
-            best, best_d = dict(r), d
-            if d == 0:
-                break
-    return best
+        best_id, best_d = None, max_distance + 1
+        for r in rows:
+            d = hamming(image_hash, r["image_hash"])
+            if d <= max_distance and d < best_d:
+                best_id, best_d = r["id"], d
+                if d == 0:
+                    break
+        if best_id is None:
+            return None
+        row = conn.execute("SELECT * FROM submissions WHERE id = ?", (best_id,)).fetchone()
+        return dict(row) if row else None
 
 
 def reconcile_duplicate_captures() -> dict:

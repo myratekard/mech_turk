@@ -102,6 +102,10 @@ class Settings:
     # short-circuits as a duplicate. Looser look-alikes fall through to the LLM, and the
     # account-level handle check decides — so two different profiles can't be collapsed.
     dhash_distance: int = int(os.getenv("DHASH_DISTANCE", "12"))
+    # How many recent submissions the fuzzy dHash scan compares against. The scan is a linear
+    # Hamming comparison (no index for "within N bits"), so this bounds its cost. Near-dupe
+    # re-uploads are almost always recent, so a modest window suffices.
+    phash_scan_limit: int = int(os.getenv("PHASH_SCAN_LIMIT", "1000"))
     max_upload_mb: int = int(os.getenv("MAX_UPLOAD_MB", "10"))             # per-image size cap
     # Downscale the image SENT TO THE LLM to this longest-edge px (full-res still used for CV).
     # Big phone screenshots (5-8MB) are slow to upload/process and cost more tokens; the badge

@@ -204,22 +204,32 @@ def find_exact_hash_match(content_hash: str, exclude_id: Optional[int] = None) -
     return _c().find_one(q, {"_id": 0}, sort=[("id", DESCENDING)])
 
 
-def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000, exclude_id: Optional[int] = None) -> Optional[dict]:
+def find_phash_match(image_hash: str, max_distance: int, limit: Optional[int] = None, exclude_id: Optional[int] = None) -> Optional[dict]:
+    """Nearest prior submission within max_distance bits (most recent first), or None.
+
+    Two-phase to keep the linear Hamming scan cheap: phase 1 pulls ONLY (id, image_hash)
+    for the recent window and finds the closest id; phase 2 fetches that one full doc.
+    Avoids dragging every submission's analysis_json over the wire on every upload.
+    """
     if not image_hash:
         return None
     from app.services.imagehash import hamming
+    if limit is None:
+        limit = settings.phash_scan_limit
     q: dict = {"image_hash": {"$ne": None}}
     if exclude_id is not None:
         q["id"] = {"$ne": exclude_id}
-    rows = _c().find(q, {"_id": 0}).sort("id", DESCENDING).limit(limit)
-    best, best_d = None, max_distance + 1
+    rows = _c().find(q, {"_id": 0, "id": 1, "image_hash": 1}).sort("id", DESCENDING).limit(limit)
+    best_id, best_d = None, max_distance + 1
     for r in rows:
         d = hamming(image_hash, r["image_hash"])
         if d <= max_distance and d < best_d:
-            best, best_d = r, d
+            best_id, best_d = r["id"], d
             if d == 0:
                 break
-    return best
+    if best_id is None:
+        return None
+    return _c().find_one({"id": best_id}, {"_id": 0})
 
 
 def reconcile_duplicate_captures() -> dict:
