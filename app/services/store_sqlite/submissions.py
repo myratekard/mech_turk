@@ -27,6 +27,16 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+def purge_loadtest_submissions() -> int:
+    """TEMPORARY ops helper: delete pressure-test submissions by the perturbation filename
+    suffix `<stem>_p<digits>.jpg` (only the load-test driver makes those). Returns deleted."""
+    with _connect() as conn:
+        cur = conn.execute(
+            "DELETE FROM submissions WHERE file_name GLOB '*_p[0-9]*.jpg'"
+        )
+        return cur.rowcount
+
+
 def init_db() -> None:
     with _connect() as conn:
         conn.execute(
