@@ -45,9 +45,17 @@ def test_fuse_both_agree_high_confidence_no_review():
     assert r.confidence >= 0.8
 
 
-def test_fuse_disagreement_llm_yes_cv_no_routes_to_review():
-    # Second opinion disagrees with the LLM -> candidate, but a human reconciles.
+def test_fuse_disagreement_llm_high_conf_cv_no_trusts_llm():
+    # HIGH-confidence LLM verified but CV missed: CV template-match is fragile to client-side
+    # compression, so we trust the LLM (verified, no review) — CV only trims confidence.
     r = fusion.fuse(_llm(True, 0.9), _cv(False, 0.2))
+    assert r.verified is True
+    assert r.needs_review is False
+
+
+def test_fuse_disagreement_llm_borderline_cv_no_routes_to_review():
+    # BORDERLINE LLM verified (>= conf_min, < conf_high) + CV miss -> a human reconciles.
+    r = fusion.fuse(_llm(True, 0.5), _cv(False, 0.2))
     assert r.verified is True
     assert r.needs_review is True
 
