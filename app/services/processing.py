@@ -49,19 +49,22 @@ def apply_african_gate(result, status: str, points: int) -> tuple[str, int]:
     return "in_review", 0
 
 
-def regular_duplicate_points(user_id) -> int:
-    if submissions_db.count_user_regular_duplicates(str(user_id)) >= settings.duplicate_escalate_threshold:
-        return settings.points_duplicate_escalated
+def _duplicate_points(user_id) -> int:
+    """Unified rule: the first `duplicate_grace_count` duplicates a user accumulates (regular OR
+    self, combined) cost 0; every duplicate after that is `points_duplicate` (-2)."""
+    if submissions_db.count_user_duplicates_total(str(user_id)) < settings.duplicate_grace_count:
+        return 0
     return settings.points_duplicate
 
 
+# Both duplicate kinds now share the same penalty curve; the dup_kind label is still recorded
+# (for display / counts) but no longer changes the points.
+def regular_duplicate_points(user_id) -> int:
+    return _duplicate_points(user_id)
+
+
 def self_duplicate_points(user_id) -> int:
-    n = submissions_db.count_user_self_duplicates(str(user_id))
-    if n < settings.self_dup_warn_count:
-        return 0
-    if n < settings.self_dup_warn_count + settings.self_dup_mid_count:
-        return settings.self_dup_mid_penalty
-    return settings.points_self_duplicate
+    return _duplicate_points(user_id)
 
 
 def process_submission(row: dict) -> dict:

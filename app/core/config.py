@@ -85,15 +85,11 @@ class Settings:
     # so overlapping a handful greatly raises throughput. Clamped to [1,10]; atomic claims keep
     # the concurrent workers from grabbing the same item.
     worker_concurrency: int = int(os.getenv("WORKER_CONCURRENCY", "8"))
-    points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "-2"))          # regular duplicate, first tier (penalty)
-    points_self_duplicate: int = int(os.getenv("POINTS_SELF_DUPLICATE", "-10"))  # self re-upload, final tier (penalty)
-    # After a user racks up this many regular duplicates, the penalty escalates (to -5).
-    points_duplicate_escalated: int = int(os.getenv("POINTS_DUPLICATE_ESCALATED", "-5"))
-    duplicate_escalate_threshold: int = int(os.getenv("DUPLICATE_ESCALATE_THRESHOLD", "20"))
-    # Self-duplicate escalation: first N = warning (0 pts), next M = mid penalty, then -10.
-    self_dup_warn_count: int = int(os.getenv("SELF_DUP_WARN_COUNT", "5"))
-    self_dup_mid_count: int = int(os.getenv("SELF_DUP_MID_COUNT", "15"))
-    self_dup_mid_penalty: int = int(os.getenv("SELF_DUP_MID_PENALTY", "-5"))
+    # Unified duplicate penalty: the first DUPLICATE_GRACE_COUNT duplicates (regular + self,
+    # combined) cost 0 points; every duplicate after that is POINTS_DUPLICATE (-2). Replaces the
+    # old per-tier regular/self escalation.
+    points_duplicate: int = int(os.getenv("POINTS_DUPLICATE", "-2"))          # penalty past the grace window
+    duplicate_grace_count: int = int(os.getenv("DUPLICATE_GRACE_COUNT", "50"))  # free duplicates before any penalty
 
     # --- Abuse / cost controls ---
     daily_upload_limit: int = int(os.getenv("DAILY_UPLOAD_LIMIT", "200"))  # per user / 24h

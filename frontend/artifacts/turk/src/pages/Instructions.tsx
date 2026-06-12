@@ -67,7 +67,7 @@ const rules = [
   {
     icon: Ban,
     label: "Avoid duplicates",
-    detail: "Each account should only be captured once. Try to avoid uploading duplicates or re-uploading the same image — they don't earn points and can cost you points.",
+    detail: "Each account should only be captured once. Duplicates earn no points — and after your first 50, every further duplicate costs you 2 points.",
   },
   {
     icon: AlertTriangle,
@@ -78,7 +78,7 @@ const rules = [
 
 const pointTiers = [
   { label: "Approved verified account", range: "+50 pts", color: "text-green-500" },
-  { label: "Duplicate", range: "−2 to −10 pts", color: "text-red-500" },
+  { label: "Duplicate", range: "0 pts (−2 after 50)", color: "text-red-500" },
   { label: "Invalid / unsupported", range: "0 pts", color: "text-muted-foreground" },
 ];
 

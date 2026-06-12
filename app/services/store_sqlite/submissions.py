@@ -27,6 +27,16 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+def purge_loadtest_submissions() -> int:
+    """TEMPORARY ops helper: delete pressure-test submissions by the perturbation filename
+    suffix `<stem>_p<digits>.jpg` (only the load-test driver makes those). Returns deleted."""
+    with _connect() as conn:
+        cur = conn.execute(
+            "DELETE FROM submissions WHERE file_name GLOB '*_p[0-9]*.jpg'"
+        )
+        return cur.rowcount
+
+
 def init_db() -> None:
     with _connect() as conn:
         conn.execute(
@@ -248,6 +258,15 @@ def count_user_duplicates(user_id: str, dup_kind: str) -> int:
         return int(conn.execute(
             "SELECT COUNT(*) c FROM submissions WHERE user_id=? AND status='duplicate' AND dup_kind=?",
             (user_id, dup_kind),
+        ).fetchone()["c"])
+
+
+def count_user_duplicates_total(user_id: str) -> int:
+    """All of a user's duplicates (regular + self), for the unified grace-then-penalty rule."""
+    with _connect() as conn:
+        return int(conn.execute(
+            "SELECT COUNT(*) c FROM submissions WHERE user_id=? AND status='duplicate'",
+            (user_id,),
         ).fetchone()["c"])
 
 

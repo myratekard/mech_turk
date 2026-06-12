@@ -27,6 +27,15 @@ def _c():
     return col(_COL)
 
 
+def purge_loadtest_submissions() -> int:
+    """TEMPORARY ops helper: delete pressure-test submissions, identified by the
+    perturbation filename suffix `<stem>_p<digits>.jpg` that only the load-test driver
+    produces (no real upload is named that way). Clears the dHash dedup pollution from
+    a load test so a fresh run actually exercises the LLM. Returns rows deleted."""
+    res = _c().delete_many({"file_name": {"$regex": r"_p[0-9]{5,9}\.jpg$"}})
+    return res.deleted_count
+
+
 def init_db() -> None:
     c = _c()
     c.create_index([("user_id", ASCENDING)])
@@ -171,6 +180,11 @@ def per_user_stats(org_id: Optional[int] = None) -> List[dict]:
 
 def count_user_duplicates(user_id: str, dup_kind: str) -> int:
     return int(_c().count_documents({"user_id": user_id, "status": "duplicate", "dup_kind": dup_kind}))
+
+
+def count_user_duplicates_total(user_id: str) -> int:
+    """All of a user's duplicates (regular + self), for the unified grace-then-penalty rule."""
+    return int(_c().count_documents({"user_id": user_id, "status": "duplicate"}))
 
 
 def count_user_regular_duplicates(user_id: str) -> int:
