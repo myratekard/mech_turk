@@ -27,15 +27,6 @@ def _c():
     return col(_COL)
 
 
-def purge_loadtest_submissions() -> int:
-    """TEMPORARY ops helper: delete pressure-test submissions, identified by the
-    perturbation filename suffix `<stem>_p<digits>.jpg` that only the load-test driver
-    produces (no real upload is named that way). Clears the dHash dedup pollution from
-    a load test so a fresh run actually exercises the LLM. Returns rows deleted."""
-    res = _c().delete_many({"file_name": {"$regex": r"_p[0-9]{5,9}\.jpg$"}})
-    return res.deleted_count
-
-
 def init_db() -> None:
     c = _c()
     c.create_index([("user_id", ASCENDING)])

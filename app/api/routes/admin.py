@@ -261,16 +261,6 @@ def delete_org(org_id: str, user: dict = Depends(require_superuser)):
     return {"ok": True, "id": org_id}
 
 
-@router.delete("/submissions/purge-loadtest")
-def purge_loadtest(user: dict = Depends(require_superuser)):
-    """TEMPORARY (superuser only): delete pressure-test submissions, identified by the
-    perturbation filename suffix `<stem>_p<digits>.jpg` that only the load-test driver
-    produces. Clears dHash dedup pollution between load tests. Remove after use."""
-    n = submissions_db.purge_loadtest_submissions()
-    print(f"[admin] purged {n} load-test submissions", flush=True)
-    return {"ok": True, "deleted": n}
-
-
 # ------------------------------------------------------------------ turk admins
 # Platform-level reviewers/admins (not tied to an org). Superuser invites by email
 # via a Clerk application invitation; the email match flags them turk_admin at sync.
