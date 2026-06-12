@@ -60,6 +60,7 @@ def _row_to_review_item(row: dict) -> ReviewItem:
     return ReviewItem(
         id=row["id"], userId=row["user_id"], imageUrl=row["image_url"], platform=row["platform"],
         fileName=row["file_name"], status=row["status"], createdAt=row["created_at"],
+        disputed=bool(row.get("disputed") or 0),
         verified=ver.get("verified"), confidence=ver.get("confidence"),
         needsReview=ver.get("needs_review"), profile=a.get("profile"),
         reasoning=(ver.get("llm_signal") or {}).get("reasoning"),

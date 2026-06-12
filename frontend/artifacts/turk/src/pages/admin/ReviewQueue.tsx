@@ -123,6 +123,15 @@ export default function ReviewQueue() {
                   <div className="flex items-center gap-2 mb-2">
                     <h3 className="font-bold truncate">#{it.id} · {it.fileName || "Untitled"}</h3>
                     {it.platform && <Badge variant="outline" className="uppercase font-mono text-[10px]">{it.platform}</Badge>}
+                    {it.disputed && (
+                      <Badge
+                        variant="destructive"
+                        className="uppercase font-mono text-[10px]"
+                        title="The owner contested a decided verdict — this was sent back for review"
+                      >
+                        Disputed
+                      </Badge>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm mb-3 font-mono">
                     <span className="text-muted-foreground">AI verified</span>

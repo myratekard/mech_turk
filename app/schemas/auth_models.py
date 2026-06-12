@@ -159,6 +159,7 @@ class ReviewItem(BaseModel):
     fileName: Optional[str] = None
     status: str
     createdAt: str
+    disputed: bool = False   # True when the owner contested a decided verdict (sent back to review)
     # decoded from analysis_json for the reviewer:
     verified: Optional[bool] = None
     confidence: Optional[float] = None

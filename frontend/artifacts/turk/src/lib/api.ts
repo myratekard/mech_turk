@@ -35,7 +35,7 @@ export interface User {
   id: number;
   username: string;
   email?: string | null;
-  role: "superuser" | "admin" | "user";
+  role: "superuser" | "turk_admin" | "admin" | "user";
   orgId?: number | null;
   referredBy?: number | null;
   referralCode: string;
@@ -143,6 +143,7 @@ export interface ReviewItem {
   fileName?: string;
   status: string;
   createdAt: string;
+  disputed?: boolean;
   verified?: boolean;
   confidence?: number;
   needsReview?: boolean;
