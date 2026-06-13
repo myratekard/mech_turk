@@ -267,7 +267,10 @@ def create_submission(body: SubmissionInput, user: dict = Depends(get_current_us
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
     dup_kind = None
-    if status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle):
+    # Verified but no handle extracted -> can't be deduped, so don't auto-accept; send to review.
+    if status == "accepted" and not acct_handle:
+        status, points = "in_review", 0
+    elif status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle):
         status, points, dup_kind = "duplicate", regular_duplicate_points(uid), "regular"
 
     row = submissions_db.insert_submission(

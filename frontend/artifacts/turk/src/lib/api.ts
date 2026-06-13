@@ -155,6 +155,19 @@ export interface ReviewItem {
   accountType?: "individual" | "organization" | "government" | "unknown" | null;
 }
 
+export interface SubmissionPreview {
+  platform?: string;
+  verified?: boolean;
+  confidence?: number;
+  needsReview?: boolean;
+  africanClass?: string | null;
+  africanDescent?: boolean | null;
+  accountType?: string | null;
+  handle?: string | null;
+  name?: string | null;
+  reasoning?: string | null;
+}
+
 // ---- auth (Clerk-backed; login/signup happen in Clerk UI) ----
 export interface AdminSubmission {
   id: number;
@@ -215,9 +228,15 @@ export const api = {
     return apiFetch<AdminSubmissionPage>(`/api/admin/submissions?${q.toString()}`);
   },
   adminSubmissionOrgs: () => apiFetch<{ id: string; name: string }[]>("/api/admin/submission-orgs"),
-  approve: (id: number) => apiFetch(`/api/admin/submissions/${id}/approve`, { method: "POST" }),
+  approve: (id: number, payload?: { acctHandle?: string; acctPlatform?: string }) =>
+    apiFetch(`/api/admin/submissions/${id}/approve`, {
+      method: "POST",
+      body: payload ? JSON.stringify(payload) : undefined,
+    }),
   reject: (id: number) => apiFetch(`/api/admin/submissions/${id}/reject`, { method: "POST" }),
   rerun: (id: number) => apiFetch(`/api/admin/submissions/${id}/rerun`, { method: "POST" }),
+  previewSubmission: (id: number) =>
+    apiFetch<SubmissionPreview>(`/api/admin/submissions/${id}/preview`, { method: "POST" }),
   listOrgs: () => apiFetch<Org[]>("/api/admin/orgs"),
   deleteOrg: (id: string) => apiFetch<{ ok: boolean }>(`/api/admin/orgs/${id}`, { method: "DELETE" }),
   createOrg: (name: string, adminEmail?: string) =>

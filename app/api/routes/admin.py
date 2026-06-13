@@ -130,18 +130,26 @@ def submission_orgs(_: dict = Depends(_reviewer)):
     return [{"id": o["clerk_org_id"], "name": o.get("name")} for o in auth_db.list_clerk_orgs()]
 
 
+class ApproveInput(BaseModel):
+    acctHandle: Optional[str] = None     # reviewer-supplied / confirmed handle (wins over stored)
+    acctPlatform: Optional[str] = None
+
+
 @router.post("/submissions/{submission_id}/approve")
-def approve(submission_id: int, user: dict = Depends(_reviewer)):
+def approve(submission_id: int, body: Optional[ApproveInput] = None, user: dict = Depends(_reviewer)):
     row = submissions_db.get_submission_any(submission_id)
     if not row:
         raise HTTPException(status_code=404, detail="Submission not found")
 
-    acct_platform, acct_handle = row.get("acct_platform"), row.get("acct_handle")
-    analysis_json, update_acct = None, False
-    # Intake now stores the extracted handle on every verdict, so a disputed 'invalid' already
-    # has it. This re-extract is a FALLBACK only — for legacy rows captured before that change,
-    # or rows where extraction genuinely found no handle. force_profile extracts fields even
-    # though the engine verdict wasn't "verified" (the reviewer overrides).
+    body = body or ApproveInput()
+    # Reviewer-supplied handle wins; otherwise fall back to what intake stored.
+    acct_platform = (body.acctPlatform or row.get("acct_platform"))
+    reviewer_handle = submissions_db.normalize_handle(body.acctHandle)
+    acct_handle = reviewer_handle or row.get("acct_handle")
+    analysis_json, update_acct = None, bool(reviewer_handle or body.acctPlatform)
+
+    # No handle from the reviewer or intake -> re-extract as a FALLBACK (legacy rows / missed
+    # extraction). force_profile pulls fields even when the engine verdict wasn't "verified".
     if not acct_handle:
         data = storage.read_object(row["object_path"])
         if data is not None:
@@ -152,9 +160,15 @@ def approve(submission_id: int, user: dict = Depends(_reviewer)):
                 acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
                 analysis_json, update_acct = result.model_dump_json(), True
             except Exception:
-                # Re-extract is a best-effort fallback. If the LLM is down, don't 500 the
-                # approval — accept the reviewer's verdict with the handle left unknown.
                 pass
+
+    # A handle is REQUIRED: an accepted capture with no handle has no dedup key (the same account
+    # could be accepted again by another user). Make the reviewer enter one.
+    if not acct_handle:
+        raise HTTPException(
+            status_code=400,
+            detail="A social handle is required to approve — run AI or enter it manually.",
+        )
 
     # A duplicate of an already-captured account is recorded but earns no points.
     if submissions_db.is_duplicate_capture(acct_platform, acct_handle, exclude_id=submission_id):
@@ -207,6 +221,38 @@ def rerun(submission_id: int, user: dict = Depends(_reviewer)):
     )
     return {"ok": True, "id": submission_id, "status": status, "points": points,
             "platform": platform_label(result)}
+
+
+@router.post("/submissions/{submission_id}/preview")
+def preview(submission_id: int, user: dict = Depends(_reviewer)):
+    """Run the AI on a stored submission and RETURN the extracted details WITHOUT persisting any
+    verdict. Powers the review modal's 'Run AI' — the reviewer sees the details and decides."""
+    row = submissions_db.get_submission_any(submission_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="Submission not found")
+    data = storage.read_object(row["object_path"])
+    if data is None:
+        raise HTTPException(status_code=400, detail="Stored image not found")
+    mime, _ = mimetypes.guess_type(row["file_name"] or row["object_path"])
+    try:
+        result = run_pipeline(data, mime=mime or "image/jpeg", persist=False, force_profile=True)
+    except Exception:
+        raise HTTPException(status_code=502, detail="Analysis is unavailable right now — please try again.")
+    d = result.model_dump()
+    prof = d.get("profile") or {}
+    ver = d.get("verification") or {}
+    return {
+        "platform": platform_label(result),
+        "verified": ver.get("verified"),
+        "confidence": ver.get("confidence"),
+        "needsReview": ver.get("needs_review"),
+        "africanClass": d.get("african_classification"),
+        "africanDescent": d.get("appears_african_descent"),
+        "accountType": d.get("account_type"),
+        "handle": submissions_db.normalize_handle(prof.get("handle")),
+        "name": prof.get("display_name") or prof.get("name"),
+        "reasoning": (ver.get("llm_signal") or {}).get("reasoning"),
+    }
 
 
 # --------------------------------------------------------------- organizations

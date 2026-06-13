@@ -117,7 +117,11 @@ def process_submission(row: dict) -> dict:
     acct_platform = result.platform if result.platform != "unknown" else None
     acct_handle = submissions_db.normalize_handle(getattr(result.profile, "handle", None))
     dup_kind = None
-    if status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle, exclude_id=sid):
+    # Never auto-accept a verified capture with no extracted handle: it has no dedup key, so the
+    # same account could be accepted again by another user (double-pay). Route to human review.
+    if status == "accepted" and not acct_handle:
+        status, points = "in_review", 0
+    elif status == "accepted" and submissions_db.is_duplicate_capture(acct_platform, acct_handle, exclude_id=sid):
         status, points, dup_kind = "duplicate", regular_duplicate_points(uid), "regular"
     return {
         "status": status, "points": points, "platform": platform,
