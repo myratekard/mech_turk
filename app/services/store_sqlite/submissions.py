@@ -27,6 +27,16 @@ def _connect() -> sqlite3.Connection:
     return conn
 
 
+def purge_loadtest_submissions() -> int:
+    """TEMPORARY ops helper: delete pressure-test submissions by the perturbation filename
+    suffix `<stem>_p<digits>.jpg` (only the load-test driver makes those). Returns deleted."""
+    with _connect() as conn:
+        cur = conn.execute(
+            "DELETE FROM submissions WHERE file_name GLOB '*_p[0-9]*.jpg'"
+        )
+        return cur.rowcount
+
+
 def init_db() -> None:
     with _connect() as conn:
         conn.execute(
@@ -251,6 +261,15 @@ def count_user_duplicates(user_id: str, dup_kind: str) -> int:
         ).fetchone()["c"])
 
 
+def count_user_duplicates_total(user_id: str) -> int:
+    """All of a user's duplicates (regular + self), for the unified grace-then-penalty rule."""
+    with _connect() as conn:
+        return int(conn.execute(
+            "SELECT COUNT(*) c FROM submissions WHERE user_id=? AND status='duplicate'",
+            (user_id,),
+        ).fetchone()["c"])
+
+
 def count_user_regular_duplicates(user_id: str) -> int:
     return count_user_duplicates(user_id, "regular")
 
@@ -282,27 +301,35 @@ def find_exact_hash_match(content_hash: str, exclude_id: Optional[int] = None) -
     return dict(row) if row else None
 
 
-def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000, exclude_id: Optional[int] = None) -> Optional[dict]:
-    """Nearest prior submission within max_distance bits (most recent first). None if no image_hash."""
+def find_phash_match(image_hash: str, max_distance: int, limit: Optional[int] = None, exclude_id: Optional[int] = None) -> Optional[dict]:
+    """Nearest prior submission within max_distance bits (most recent first). None if no image_hash.
+
+    Two-phase: scan only (id, image_hash) for the recent window, then fetch the one winning row."""
     if not image_hash:
         return None
     from app.services.imagehash import hamming
+    from app.core.config import settings
+    if limit is None:
+        limit = settings.phash_scan_limit
     where, params = "image_hash IS NOT NULL", []
     if exclude_id is not None:
         where += " AND id != ?"; params.append(exclude_id)
     params.append(limit)
     with _connect() as conn:
         rows = conn.execute(
-            f"SELECT * FROM submissions WHERE {where} ORDER BY id DESC LIMIT ?", params,
+            f"SELECT id, image_hash FROM submissions WHERE {where} ORDER BY id DESC LIMIT ?", params,
         ).fetchall()
-    best, best_d = None, max_distance + 1
-    for r in rows:
-        d = hamming(image_hash, r["image_hash"])
-        if d <= max_distance and d < best_d:
-            best, best_d = dict(r), d
-            if d == 0:
-                break
-    return best
+        best_id, best_d = None, max_distance + 1
+        for r in rows:
+            d = hamming(image_hash, r["image_hash"])
+            if d <= max_distance and d < best_d:
+                best_id, best_d = r["id"], d
+                if d == 0:
+                    break
+        if best_id is None:
+            return None
+        row = conn.execute("SELECT * FROM submissions WHERE id = ?", (best_id,)).fetchone()
+        return dict(row) if row else None
 
 
 def reconcile_duplicate_captures() -> dict:
@@ -498,22 +525,33 @@ def list_all_submissions(
     if user_ids is not None:
         where += f" AND user_id IN ({','.join('?' * len(user_ids))})"; params += user_ids
     with _connect() as conn:
+        # African filter keys on a field INSIDE analysis_json, so that path must scan+filter in
+        # Python. Every other (common) path paginates in the DB — without this, the admin
+        # Submissions page loaded every row + its full analysis_json blob on each poll.
+        if african:
+            def _cls(r):
+                aj = r.get("analysis_json")
+                if not aj:
+                    return None
+                try:
+                    return _json.loads(aj).get("african_classification")
+                except Exception:
+                    return None
+            rows = [r for r in (dict(x) for x in conn.execute(
+                f"SELECT * FROM submissions {where} ORDER BY id DESC", params).fetchall())
+                if _cls(r) == african]
+            total = len(rows)
+            start = (page - 1) * limit
+            return rows[start:start + limit], total
+        total = conn.execute(
+            f"SELECT COUNT(*) AS c FROM submissions {where}", params
+        ).fetchone()["c"]
+        offset = (page - 1) * limit
         rows = [dict(r) for r in conn.execute(
-            f"SELECT * FROM submissions {where} ORDER BY id DESC", params
+            f"SELECT * FROM submissions {where} ORDER BY id DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
         ).fetchall()]
-    if african:
-        def _cls(r):
-            aj = r.get("analysis_json")
-            if not aj:
-                return None
-            try:
-                return _json.loads(aj).get("african_classification")
-            except Exception:
-                return None
-        rows = [r for r in rows if _cls(r) == african]
-    total = len(rows)
-    start = (page - 1) * limit
-    return rows[start:start + limit], total
+    return rows, int(total)
 
 
 def get_submission(user_id: str, submission_id: int) -> Optional[dict]:

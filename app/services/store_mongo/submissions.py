@@ -27,6 +27,15 @@ def _c():
     return col(_COL)
 
 
+def purge_loadtest_submissions() -> int:
+    """TEMPORARY ops helper: delete pressure-test submissions, identified by the
+    perturbation filename suffix `<stem>_p<digits>.jpg` that only the load-test driver
+    produces (no real upload is named that way). Clears the dHash dedup pollution from
+    a load test so a fresh run actually exercises the LLM. Returns rows deleted."""
+    res = _c().delete_many({"file_name": {"$regex": r"_p[0-9]{5,9}\.jpg$"}})
+    return res.deleted_count
+
+
 def init_db() -> None:
     c = _c()
     c.create_index([("user_id", ASCENDING)])
@@ -173,6 +182,11 @@ def count_user_duplicates(user_id: str, dup_kind: str) -> int:
     return int(_c().count_documents({"user_id": user_id, "status": "duplicate", "dup_kind": dup_kind}))
 
 
+def count_user_duplicates_total(user_id: str) -> int:
+    """All of a user's duplicates (regular + self), for the unified grace-then-penalty rule."""
+    return int(_c().count_documents({"user_id": user_id, "status": "duplicate"}))
+
+
 def count_user_regular_duplicates(user_id: str) -> int:
     return count_user_duplicates(user_id, "regular")
 
@@ -195,22 +209,32 @@ def find_exact_hash_match(content_hash: str, exclude_id: Optional[int] = None) -
     return _c().find_one(q, {"_id": 0}, sort=[("id", DESCENDING)])
 
 
-def find_phash_match(image_hash: str, max_distance: int, limit: int = 5000, exclude_id: Optional[int] = None) -> Optional[dict]:
+def find_phash_match(image_hash: str, max_distance: int, limit: Optional[int] = None, exclude_id: Optional[int] = None) -> Optional[dict]:
+    """Nearest prior submission within max_distance bits (most recent first), or None.
+
+    Two-phase to keep the linear Hamming scan cheap: phase 1 pulls ONLY (id, image_hash)
+    for the recent window and finds the closest id; phase 2 fetches that one full doc.
+    Avoids dragging every submission's analysis_json over the wire on every upload.
+    """
     if not image_hash:
         return None
     from app.services.imagehash import hamming
+    if limit is None:
+        limit = settings.phash_scan_limit
     q: dict = {"image_hash": {"$ne": None}}
     if exclude_id is not None:
         q["id"] = {"$ne": exclude_id}
-    rows = _c().find(q, {"_id": 0}).sort("id", DESCENDING).limit(limit)
-    best, best_d = None, max_distance + 1
+    rows = _c().find(q, {"_id": 0, "id": 1, "image_hash": 1}).sort("id", DESCENDING).limit(limit)
+    best_id, best_d = None, max_distance + 1
     for r in rows:
         d = hamming(image_hash, r["image_hash"])
         if d <= max_distance and d < best_d:
-            best, best_d = r, d
+            best_id, best_d = r["id"], d
             if d == 0:
                 break
-    return best
+    if best_id is None:
+        return None
+    return _c().find_one({"id": best_id}, {"_id": 0})
 
 
 def reconcile_duplicate_captures() -> dict:
@@ -354,7 +378,10 @@ def list_all_submissions(
         q["org_id"] = org_id
     if user_ids is not None:
         q["user_id"] = {"$in": user_ids}
-    rows = list(_c().find(q, {"_id": 0}).sort("id", DESCENDING))
+    c = _c()
+    # African filter keys on a field INSIDE analysis_json, so that path must scan+filter in
+    # Python. Every other (common) path paginates in the DB — without this, the admin
+    # Submissions page pulled every row + its full analysis_json blob on each poll.
     if african:
         def _cls(r):
             aj = r.get("analysis_json")
@@ -364,10 +391,14 @@ def list_all_submissions(
                 return _json.loads(aj).get("african_classification")
             except Exception:
                 return None
-        rows = [r for r in rows if _cls(r) == african]
-    total = len(rows)
-    start = (page - 1) * limit
-    return rows[start:start + limit], total
+        rows = [r for r in c.find(q, {"_id": 0}).sort("id", DESCENDING) if _cls(r) == african]
+        total = len(rows)
+        start = (page - 1) * limit
+        return rows[start:start + limit], total
+    total = c.count_documents(q)
+    rows = list(c.find(q, {"_id": 0}).sort("id", DESCENDING)
+                .skip((page - 1) * limit).limit(limit))
+    return rows, int(total)
 
 
 def get_submission(user_id: str, submission_id: int) -> Optional[dict]:
