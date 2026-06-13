@@ -378,7 +378,10 @@ def list_all_submissions(
         q["org_id"] = org_id
     if user_ids is not None:
         q["user_id"] = {"$in": user_ids}
-    rows = list(_c().find(q, {"_id": 0}).sort("id", DESCENDING))
+    c = _c()
+    # African filter keys on a field INSIDE analysis_json, so that path must scan+filter in
+    # Python. Every other (common) path paginates in the DB — without this, the admin
+    # Submissions page pulled every row + its full analysis_json blob on each poll.
     if african:
         def _cls(r):
             aj = r.get("analysis_json")
@@ -388,10 +391,14 @@ def list_all_submissions(
                 return _json.loads(aj).get("african_classification")
             except Exception:
                 return None
-        rows = [r for r in rows if _cls(r) == african]
-    total = len(rows)
-    start = (page - 1) * limit
-    return rows[start:start + limit], total
+        rows = [r for r in c.find(q, {"_id": 0}).sort("id", DESCENDING) if _cls(r) == african]
+        total = len(rows)
+        start = (page - 1) * limit
+        return rows[start:start + limit], total
+    total = c.count_documents(q)
+    rows = list(c.find(q, {"_id": 0}).sort("id", DESCENDING)
+                .skip((page - 1) * limit).limit(limit))
+    return rows, int(total)
 
 
 def get_submission(user_id: str, submission_id: int) -> Optional[dict]:

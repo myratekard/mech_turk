@@ -525,22 +525,33 @@ def list_all_submissions(
     if user_ids is not None:
         where += f" AND user_id IN ({','.join('?' * len(user_ids))})"; params += user_ids
     with _connect() as conn:
+        # African filter keys on a field INSIDE analysis_json, so that path must scan+filter in
+        # Python. Every other (common) path paginates in the DB — without this, the admin
+        # Submissions page loaded every row + its full analysis_json blob on each poll.
+        if african:
+            def _cls(r):
+                aj = r.get("analysis_json")
+                if not aj:
+                    return None
+                try:
+                    return _json.loads(aj).get("african_classification")
+                except Exception:
+                    return None
+            rows = [r for r in (dict(x) for x in conn.execute(
+                f"SELECT * FROM submissions {where} ORDER BY id DESC", params).fetchall())
+                if _cls(r) == african]
+            total = len(rows)
+            start = (page - 1) * limit
+            return rows[start:start + limit], total
+        total = conn.execute(
+            f"SELECT COUNT(*) AS c FROM submissions {where}", params
+        ).fetchone()["c"]
+        offset = (page - 1) * limit
         rows = [dict(r) for r in conn.execute(
-            f"SELECT * FROM submissions {where} ORDER BY id DESC", params
+            f"SELECT * FROM submissions {where} ORDER BY id DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
         ).fetchall()]
-    if african:
-        def _cls(r):
-            aj = r.get("analysis_json")
-            if not aj:
-                return None
-            try:
-                return _json.loads(aj).get("african_classification")
-            except Exception:
-                return None
-        rows = [r for r in rows if _cls(r) == african]
-    total = len(rows)
-    start = (page - 1) * limit
-    return rows[start:start + limit], total
+    return rows, int(total)
 
 
 def get_submission(user_id: str, submission_id: int) -> Optional[dict]:
